@@ -1,15 +1,20 @@
 import { useEffect, useRef, useState } from "react";
 import { AlertTriangle, RefreshCw } from "lucide-react";
 import { Viewport, type ViewportStatus } from "./Viewport";
+import type { ModelObjectSnapshot, ObjectId } from "../editor/document/types";
 
 export interface ViewportCanvasProps {
   onStatusChange(status: ViewportStatus): void;
   projection: "perspective" | "orthographic";
+  objects: readonly ModelObjectSnapshot[];
+  selectedObjectIds: ReadonlySet<ObjectId>;
 }
 
 export function ViewportCanvas({
   onStatusChange,
   projection,
+  objects,
+  selectedObjectIds,
 }: ViewportCanvasProps) {
   const hostRef = useRef<HTMLDivElement>(null);
   const viewportRef = useRef<Viewport>(null);
@@ -31,6 +36,10 @@ export function ViewportCanvas({
   }, [onStatusChange]);
 
   useEffect(() => viewportRef.current?.setProjection(projection), [projection]);
+  useEffect(
+    () => viewportRef.current?.syncObjects(objects, selectedObjectIds),
+    [objects, selectedObjectIds],
+  );
 
   return (
     <div

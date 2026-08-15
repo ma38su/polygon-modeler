@@ -11,6 +11,8 @@ import {
 } from "three";
 import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
 import type { WebGPURenderer as WebGpuRenderer } from "three/webgpu";
+import type { ModelObjectSnapshot, ObjectId } from "../editor/document/types";
+import { RenderGeometryAdapter } from "./adapters/RenderGeometryAdapter";
 import {
   canUseWebGpu,
   getRendererPreference,
@@ -31,6 +33,7 @@ type Renderer = WebGLRenderer | WebGpuRenderer;
 export class Viewport {
   readonly element: HTMLElement;
   readonly #scene = new Scene();
+  readonly #geometryAdapter = new RenderGeometryAdapter();
   readonly #perspectiveCamera = new PerspectiveCamera(45, 1, 0.01, 10_000);
   readonly #orthographicCamera = new OrthographicCamera(
     -5,
@@ -55,6 +58,7 @@ export class Viewport {
     this.#scene.add(new GridHelper(20, 20, 0x586476, 0x343b47));
     this.#scene.add(new AxesHelper(2));
     this.#scene.add(new HemisphereLight(0xffffff, 0x28303d, 1.5));
+    this.#scene.add(this.#geometryAdapter.group);
     this.#perspectiveCamera.position.set(6, 5, 8);
     this.#orthographicCamera.position.copy(this.#perspectiveCamera.position);
 
@@ -104,6 +108,13 @@ export class Viewport {
     this.#emitStatus();
   }
 
+  syncObjects(
+    objects: readonly ModelObjectSnapshot[],
+    selectedIds: ReadonlySet<ObjectId>,
+  ): void {
+    this.#geometryAdapter.sync(objects, selectedIds);
+  }
+
   dispose(): void {
     this.#disposed = true;
     this.#resizeObserver.disconnect();
@@ -113,6 +124,7 @@ export class Viewport {
     }
     this.#renderer?.setAnimationLoop(null);
     this.#renderer?.dispose();
+    this.#geometryAdapter.dispose();
     this.element.replaceChildren();
   }
 

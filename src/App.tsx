@@ -5,14 +5,19 @@ import {
   ChevronDown,
   CircleGauge,
   Expand,
+  Eye,
+  EyeOff,
   MousePointer2,
   Move3D,
+  Plus,
   Redo2,
   Rotate3D,
+  Trash2,
   Undo2,
 } from "lucide-react";
 import { ViewportCanvas } from "./viewport/ViewportCanvas";
 import type { ViewportStatus } from "./viewport/Viewport";
+import { useEditor, useEditorSnapshot } from "./app/useEditor";
 import "./App.css";
 
 type Capability = "checking" | "webgpu" | "webgl2" | "unsupported";
@@ -24,6 +29,8 @@ const labels: Record<Capability, string> = {
 };
 
 export default function App() {
+  const editor = useEditor();
+  const snapshot = useEditorSnapshot();
   const [capability, setCapability] = useState<Capability>("checking");
   const [projection, setProjection] = useState<"perspective" | "orthographic">(
     "perspective",
@@ -80,6 +87,24 @@ export default function App() {
               {label}
             </button>
           ))}
+          <div className="tool-divider" />
+          <button
+            type="button"
+            className="tool-button"
+            onClick={() => editor.createBox()}
+          >
+            <Plus aria-hidden="true" />
+            Box追加
+          </button>
+          <button
+            type="button"
+            className="tool-button"
+            disabled={snapshot.selectedObjectIds.size === 0}
+            onClick={() => editor.deleteSelectedObjects()}
+          >
+            <Trash2 aria-hidden="true" />
+            削除
+          </button>
         </aside>
 
         <section className="viewport-panel" aria-label="3D ビューポート">
@@ -104,16 +129,56 @@ export default function App() {
           <ViewportCanvas
             projection={projection}
             onStatusChange={handleViewportStatus}
+            objects={snapshot.objects}
+            selectedObjectIds={snapshot.selectedObjectIds}
           />
         </section>
 
         <aside className="side-panel">
           <section aria-labelledby="outliner-title">
             <h2 id="outliner-title">オブジェクト</h2>
-            <div className="empty-state">
-              <Box aria-hidden="true" />
-              シーンは空です
-            </div>
+            {snapshot.objects.length === 0 ? (
+              <div className="empty-state">
+                <Box aria-hidden="true" />
+                シーンは空です
+              </div>
+            ) : (
+              <ul className="object-list">
+                {snapshot.objects.map((object) => (
+                  <li
+                    className={
+                      snapshot.selectedObjectIds.has(object.id)
+                        ? "selected"
+                        : ""
+                    }
+                    key={object.id}
+                  >
+                    <button
+                      type="button"
+                      className="object-select"
+                      onClick={() => editor.selectObject(object.id)}
+                    >
+                      <Box aria-hidden="true" />
+                      {object.name}
+                    </button>
+                    <button
+                      type="button"
+                      className="visibility-toggle"
+                      aria-label={`${object.name}を${object.visible ? "非表示" : "表示"}`}
+                      onClick={() =>
+                        editor.setObjectVisible(object.id, !object.visible)
+                      }
+                    >
+                      {object.visible ? (
+                        <Eye aria-hidden="true" />
+                      ) : (
+                        <EyeOff aria-hidden="true" />
+                      )}
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            )}
           </section>
           <section aria-labelledby="inspector-title">
             <h2 id="inspector-title">インスペクター</h2>
@@ -123,9 +188,21 @@ export default function App() {
       </div>
 
       <footer className="status-bar">
-        <span>選択: 0</span>
-        <span>頂点: 0</span>
-        <span>面: 0</span>
+        <span>選択: {snapshot.selectedObjectIds.size}</span>
+        <span>
+          頂点:{" "}
+          {snapshot.objects.reduce(
+            (sum, object) => sum + object.mesh.positions.length / 3,
+            0,
+          )}
+        </span>
+        <span>
+          面:{" "}
+          {snapshot.objects.reduce(
+            (sum, object) => sum + object.mesh.faces.length,
+            0,
+          )}
+        </span>
         <span
           className={`renderer-status renderer-status-${capability}`}
           data-testid="renderer-capability"

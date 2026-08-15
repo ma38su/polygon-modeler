@@ -10,6 +10,16 @@ test("shows the empty editor shell", async ({ page }) => {
   await expect(page.getByTestId("renderer-capability")).toContainText(
     "WebGL 2",
   );
+  await page.getByRole("button", { name: "Box追加" }).click();
+  await expect(
+    page.getByRole("button", { name: "Box 1", exact: true }),
+  ).toBeVisible();
+  await expect(page.getByText("頂点: 8")).toBeVisible();
+  await expect(page.getByText("面: 6")).toBeVisible();
+  await page.getByRole("button", { name: "Box 1を非表示" }).click();
+  await expect(page.getByRole("button", { name: "Box 1を表示" })).toBeVisible();
+  await page.getByRole("button", { name: "削除" }).click();
+  await expect(page.getByText("シーンは空です")).toBeVisible();
   await page.getByRole("button", { name: "正投影" }).click();
   await expect(page.getByRole("button", { name: "正投影" })).toHaveClass(
     /active/,
