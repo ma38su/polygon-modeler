@@ -34,6 +34,22 @@ export function useProjectPersistence(
     return () => window.clearTimeout(timer);
   }, [editor, isDirty, onError, revision]);
 
+  useEffect(() => {
+    if (!isDirty) return;
+    const protect = () => {
+      void saveAutosave(editor.serializeProject());
+    };
+    const onVisibilityChange = () => {
+      if (document.visibilityState === "hidden") protect();
+    };
+    window.addEventListener("beforeunload", protect);
+    document.addEventListener("visibilitychange", onVisibilityChange);
+    return () => {
+      window.removeEventListener("beforeunload", protect);
+      document.removeEventListener("visibilitychange", onVisibilityChange);
+    };
+  }, [editor, isDirty]);
+
   const saveFile = useCallback(() => {
     const source = editor.serializeProject();
     const url = URL.createObjectURL(
