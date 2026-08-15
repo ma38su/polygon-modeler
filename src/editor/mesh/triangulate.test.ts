@@ -6,12 +6,22 @@ describe("triangulate", () => {
       positions: [0, 0, 0, 1, 0, 0, 2, 1, 0, 1, 2, 0, 0, 1, 0],
       faces: [[0, 1, 2, 3, 4]],
       revision: 1,
+      vertexIds: [],
+      faceIds: [],
+      edges: [],
     };
     expect(triangulate(mesh)).toEqual([0, 1, 2, 0, 2, 3, 0, 3, 4]);
     expect(triangulate(mesh)).toEqual(triangulate(mesh));
   });
   it("rejects invalid render indices", () =>
     expect(() =>
-      triangulate({ positions: [0, 0, 0], faces: [[0, 1, 2]], revision: 1 }),
+      triangulate({
+        positions: [0, 0, 0],
+        faces: [[0, 1, 2]],
+        revision: 1,
+        vertexIds: [],
+        faceIds: [],
+        edges: [],
+      }),
     ).toThrow("out of range"));
 });

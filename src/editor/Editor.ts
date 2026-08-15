@@ -13,12 +13,18 @@ import {
   TransformObjectCommand,
 } from "./commands/objectCommands";
 import type { TransformValue } from "./document/types";
+import {
+  SelectionManager,
+  type SelectionItem,
+  type SelectionMode,
+} from "./selection/SelectionManager";
 type Listener = () => void;
 export class Editor {
   readonly document = new ModelDocument();
   readonly #listeners = new Set<Listener>();
   readonly #selectedObjectIds = new Set<ObjectId>();
   readonly history = new CommandHistory();
+  readonly selection = new SelectionManager();
   #nextObjectId = 1;
   #revision = 0;
   #snapshot: EditorSnapshot = this.#createSnapshot();
@@ -45,6 +51,8 @@ export class Editor {
     this.history.execute(new CreateObjectCommand(object), this.document);
     this.#selectedObjectIds.clear();
     this.#selectedObjectIds.add(id);
+    this.selection.setMode("object");
+    this.selection.replace({ objectId: id, elementId: id });
     this.#commit();
     return id;
   }
@@ -55,12 +63,56 @@ export class Editor {
       this.document,
     );
     this.#selectedObjectIds.clear();
+    this.selection.clear();
     this.#commit();
   }
   selectObject(id?: ObjectId): void {
     if (id && !this.document.getObject(id)) return;
     this.#selectedObjectIds.clear();
+    this.selection.setMode("object");
     if (id) this.#selectedObjectIds.add(id);
+    this.selection.replace(id ? { objectId: id, elementId: id } : undefined);
+    this.#commit();
+  }
+  setSelectionMode(mode: SelectionMode): void {
+    if (!this.selection.setMode(mode)) return;
+    this.#selectedObjectIds.clear();
+    this.#commit();
+  }
+  selectElement(item?: SelectionItem, additive = false): void {
+    if (additive && item) this.selection.toggle(item);
+    else this.selection.replace(item);
+    this.#selectedObjectIds.clear();
+    for (const selected of this.selection.items)
+      this.#selectedObjectIds.add(selected.objectId);
+    this.#commit();
+  }
+  clearSelection(): void {
+    this.selection.clear();
+    this.#selectedObjectIds.clear();
+    this.#commit();
+  }
+  selectAll(): void {
+    const items: SelectionItem[] = [];
+    for (const object of this.document.toSnapshot()) {
+      if (this.selection.mode === "object")
+        items.push({ objectId: object.id, elementId: object.id });
+      else if (this.selection.mode === "vertex")
+        object.mesh.vertexIds.forEach((id) =>
+          items.push({ objectId: object.id, elementId: id }),
+        );
+      else if (this.selection.mode === "edge")
+        object.mesh.edges.forEach((edge) =>
+          items.push({ objectId: object.id, elementId: edge.id }),
+        );
+      else
+        object.mesh.faceIds.forEach((id) =>
+          items.push({ objectId: object.id, elementId: id }),
+        );
+    }
+    this.selection.selectAll(items);
+    this.#selectedObjectIds.clear();
+    for (const item of items) this.#selectedObjectIds.add(item.objectId);
     this.#commit();
   }
   setObjectVisible(id: ObjectId, visible: boolean): void {
@@ -106,6 +158,8 @@ export class Editor {
       revision: this.#revision,
       canUndo: this.history.canUndo,
       canRedo: this.history.canRedo,
+      selectionMode: this.selection.mode,
+      selectionItems: this.selection.items,
     };
   }
 }

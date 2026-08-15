@@ -155,6 +155,18 @@ export class EditableMesh {
         face.vertices.map((id) => indexById.get(id)!),
       ),
       revision: this.#revision,
+      vertexIds: vertices.map((vertex) => vertex.id),
+      faceIds: [...this.faces.keys()],
+      edges: [...this.edges.values()].map((edge) => {
+        const halfEdge = this.halfEdges.get(edge.halfEdges[0]!)!;
+        return {
+          id: edge.id,
+          vertices: [
+            indexById.get(halfEdge.origin)!,
+            indexById.get(halfEdge.destination)!,
+          ],
+        };
+      }),
     };
   }
   #id(prefix: string, sequence: number) {

@@ -21,4 +21,20 @@ describe("Editor", () => {
     editor.deleteSelectedObjects();
     expect(editor.createBox()).not.toBe(first);
   });
+  it("selects all stable elements and clears them on mode changes", () => {
+    const editor = new Editor();
+    editor.createBox();
+    editor.setSelectionMode("vertex");
+    editor.selectAll();
+    expect(editor.getSnapshot().selectionItems).toHaveLength(8);
+    editor.setSelectionMode("edge");
+    expect(editor.getSnapshot().selectionItems).toHaveLength(0);
+    editor.selectAll();
+    expect(editor.getSnapshot().selectionItems).toHaveLength(12);
+    editor.setSelectionMode("face");
+    editor.selectAll();
+    expect(editor.getSnapshot().selectionItems).toHaveLength(6);
+    editor.clearSelection();
+    expect(editor.getSnapshot().selectionItems).toHaveLength(0);
+  });
 });

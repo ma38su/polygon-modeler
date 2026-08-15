@@ -54,6 +54,11 @@ export default function App() {
       editor.transformObject(...args),
     [editor],
   );
+  const handlePick = useCallback(
+    (item: Parameters<typeof editor.selectElement>[0], additive: boolean) =>
+      editor.selectElement(item, additive),
+    [editor],
+  );
 
   return (
     <main className="editor-shell">
@@ -146,6 +151,25 @@ export default function App() {
         </aside>
 
         <section className="viewport-panel" aria-label="3D ビューポート">
+          <div className="selection-mode-bar" aria-label="選択モード">
+            {(
+              [
+                ["object", "Object"],
+                ["vertex", "Vertex"],
+                ["edge", "Edge"],
+                ["face", "Face"],
+              ] as const
+            ).map(([mode, label]) => (
+              <button
+                type="button"
+                key={mode}
+                className={snapshot.selectionMode === mode ? "active" : ""}
+                onClick={() => editor.setSelectionMode(mode)}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
           <div className="viewport-toolbar" aria-label="ビューポート設定">
             <button
               type="button"
@@ -171,6 +195,8 @@ export default function App() {
             selectedObjectIds={snapshot.selectedObjectIds}
             transformMode={transformMode}
             onTransformCommit={handleTransformCommit}
+            selectionMode={snapshot.selectionMode}
+            onPick={handlePick}
           />
         </section>
 
@@ -232,7 +258,8 @@ export default function App() {
       </div>
 
       <footer className="status-bar">
-        <span>選択: {snapshot.selectedObjectIds.size}</span>
+        <span>モード: {snapshot.selectionMode}</span>
+        <span>選択: {snapshot.selectionItems.length}</span>
         <span>
           頂点:{" "}
           {snapshot.objects.reduce(

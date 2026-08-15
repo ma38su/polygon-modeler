@@ -62,6 +62,11 @@ export class RenderGeometryAdapter {
   getMesh(id: ObjectId): Mesh | undefined {
     return this.#meshes.get(id);
   }
+  getObjectId(mesh: Mesh): ObjectId | undefined {
+    for (const [id, candidate] of this.#meshes)
+      if (candidate === mesh) return id;
+    return undefined;
+  }
   #createMesh(object: ModelObjectSnapshot): Mesh {
     return new Mesh(
       this.#createGeometry(object),

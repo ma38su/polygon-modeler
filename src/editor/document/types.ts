@@ -17,6 +17,12 @@ export interface MeshData {
   readonly positions: readonly number[];
   readonly faces: readonly (readonly number[])[];
   readonly revision: number;
+  readonly vertexIds: readonly VertexId[];
+  readonly faceIds: readonly FaceId[];
+  readonly edges: readonly {
+    readonly id: EdgeId;
+    readonly vertices: readonly [number, number];
+  }[];
 }
 export interface ModelObjectSnapshot {
   readonly id: ObjectId;
@@ -31,4 +37,6 @@ export interface EditorSnapshot {
   readonly revision: number;
   readonly canUndo: boolean;
   readonly canRedo: boolean;
+  readonly selectionMode: import("../selection/SelectionManager").SelectionMode;
+  readonly selectionItems: readonly import("../selection/SelectionManager").SelectionItem[];
 }

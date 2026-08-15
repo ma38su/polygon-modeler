@@ -7,6 +7,10 @@ import {
   type ViewportStatus,
 } from "./Viewport";
 import type { ModelObjectSnapshot, ObjectId } from "../editor/document/types";
+import type {
+  SelectionItem,
+  SelectionMode,
+} from "../editor/selection/SelectionManager";
 
 export interface ViewportCanvasProps {
   onStatusChange(status: ViewportStatus): void;
@@ -15,6 +19,8 @@ export interface ViewportCanvasProps {
   selectedObjectIds: ReadonlySet<ObjectId>;
   transformMode: TransformMode;
   onTransformCommit: TransformCommitListener;
+  selectionMode: SelectionMode;
+  onPick(item: SelectionItem | undefined, additive: boolean): void;
 }
 
 export function ViewportCanvas({
@@ -24,6 +30,8 @@ export function ViewportCanvas({
   selectedObjectIds,
   transformMode,
   onTransformCommit,
+  selectionMode,
+  onPick,
 }: ViewportCanvasProps) {
   const hostRef = useRef<HTMLDivElement>(null);
   const viewportRef = useRef<Viewport>(null);
@@ -49,6 +57,10 @@ export function ViewportCanvas({
   useEffect(
     () => viewportRef.current?.syncObjects(objects, selectedObjectIds),
     [objects, selectedObjectIds],
+  );
+  useEffect(
+    () => viewportRef.current?.setPicking(selectionMode, onPick),
+    [selectionMode, onPick],
   );
   useEffect(
     () => viewportRef.current?.setTransformMode(transformMode),

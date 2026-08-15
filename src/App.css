@@ -149,6 +149,30 @@ h2 {
   background: color-mix(in srgb, var(--surface-1), transparent 8%);
   box-shadow: 0 6px 16px rgb(0 0 0 / 18%);
 }
+.selection-mode-bar {
+  position: absolute;
+  z-index: 2;
+  top: 10px;
+  left: 150px;
+  display: flex;
+  gap: 2px;
+  padding: 3px;
+  border: 1px solid var(--border);
+  border-radius: 7px;
+  background: color-mix(in srgb, var(--surface-1), transparent 8%);
+}
+.selection-mode-bar button {
+  padding: 5px 7px;
+  border: 0;
+  border-radius: 4px;
+  color: var(--text-muted);
+  background: transparent;
+  font-size: 11px;
+}
+.selection-mode-bar button.active {
+  color: var(--text-primary);
+  background: var(--surface-3);
+}
 .viewport-toolbar button {
   display: flex;
   align-items: center;

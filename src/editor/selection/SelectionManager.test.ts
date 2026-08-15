@@ -1,0 +1,34 @@
+import { describe, expect, it } from "vitest";
+import type { ObjectId, VertexId } from "../document/types";
+import { SelectionManager } from "./SelectionManager";
+const objectId = "object-1" as ObjectId;
+const vertex = (id: string) => ({ objectId, elementId: id as VertexId });
+describe("SelectionManager", () => {
+  it("supports replace, toggle, all, and clear", () => {
+    const s = new SelectionManager();
+    s.setMode("vertex");
+    s.replace(vertex("v-1"));
+    s.toggle(vertex("v-2"));
+    expect(s.items).toHaveLength(2);
+    s.toggle(vertex("v-1"));
+    expect(s.items).toEqual([vertex("v-2")]);
+    s.selectAll([vertex("v-1"), vertex("v-2")]);
+    expect(s.items).toHaveLength(2);
+    s.clear();
+    expect(s.items).toHaveLength(0);
+  });
+  it("clears incompatible elements on mode change", () => {
+    const s = new SelectionManager();
+    s.setMode("vertex");
+    s.replace(vertex("v-1"));
+    s.setMode("face");
+    expect(s.items).toHaveLength(0);
+  });
+  it("removes elements for a deleted object", () => {
+    const s = new SelectionManager();
+    s.setMode("vertex");
+    s.selectAll([vertex("v-1"), vertex("v-2")]);
+    s.removeObject(objectId);
+    expect(s.items).toHaveLength(0);
+  });
+});

@@ -18,6 +18,11 @@ import type {
   TransformValue,
 } from "../editor/document/types";
 import { RenderGeometryAdapter } from "./adapters/RenderGeometryAdapter";
+import { CpuPicker } from "./picking/CpuPicker";
+import type {
+  SelectionItem,
+  SelectionMode,
+} from "../editor/selection/SelectionManager";
 import {
   canUseWebGpu,
   getRendererPreference,
@@ -45,6 +50,7 @@ export class Viewport {
   readonly element: HTMLElement;
   readonly #scene = new Scene();
   readonly #geometryAdapter = new RenderGeometryAdapter();
+  readonly #picker = new CpuPicker();
   readonly #perspectiveCamera = new PerspectiveCamera(45, 1, 0.01, 10_000);
   readonly #orthographicCamera = new OrthographicCamera(
     -5,
@@ -64,6 +70,10 @@ export class Viewport {
   #transformCommitListener?: TransformCommitListener;
   #selectedObjectId?: ObjectId;
   #transformBefore?: TransformValue;
+  #objects: readonly ModelObjectSnapshot[] = [];
+  #selectionMode: SelectionMode = "object";
+  #pickListener?: (item: SelectionItem | undefined, additive: boolean) => void;
+  #pointerStart?: { x: number; y: number };
   #animationFrame?: number;
   #disposed = false;
 
@@ -120,6 +130,7 @@ export class Viewport {
     this.#camera.position.copy(previous.position);
     this.#camera.quaternion.copy(previous.quaternion);
     this.#controls?.dispose();
+    this.#removePointerListeners();
     this.#disposeTransformControls();
     this.#initializeControls();
     this.#initializeTransformControls();
@@ -133,8 +144,16 @@ export class Viewport {
     selectedIds: ReadonlySet<ObjectId>,
   ): void {
     this.#geometryAdapter.sync(objects, selectedIds);
+    this.#objects = objects;
     this.#selectedObjectId = selectedIds.values().next().value;
     this.#attachSelectedObject();
+  }
+  setPicking(
+    mode: SelectionMode,
+    listener: (item: SelectionItem | undefined, additive: boolean) => void,
+  ): void {
+    this.#selectionMode = mode;
+    this.#pickListener = listener;
   }
 
   setTransformMode(mode: TransformMode): void {
@@ -150,6 +169,7 @@ export class Viewport {
     this.#disposed = true;
     this.#resizeObserver.disconnect();
     this.#controls?.dispose();
+    this.#removePointerListeners();
     this.#disposeTransformControls();
     if (this.#animationFrame !== undefined) {
       cancelAnimationFrame(this.#animationFrame);
@@ -199,7 +219,43 @@ export class Viewport {
     this.#controls.enableDamping = true;
     this.#controls.screenSpacePanning = true;
     this.#controls.update();
+    this.#renderer.domElement.addEventListener(
+      "pointerdown",
+      this.#handlePointerDown,
+    );
+    this.#renderer.domElement.addEventListener(
+      "pointerup",
+      this.#handlePointerUp,
+    );
   }
+  #handlePointerDown = (event: PointerEvent): void => {
+    this.#pointerStart = { x: event.clientX, y: event.clientY };
+  };
+  #removePointerListeners(): void {
+    const canvas = this.#renderer?.domElement;
+    canvas?.removeEventListener("pointerdown", this.#handlePointerDown);
+    canvas?.removeEventListener("pointerup", this.#handlePointerUp);
+  }
+  #handlePointerUp = (event: PointerEvent): void => {
+    const start = this.#pointerStart;
+    this.#pointerStart = undefined;
+    if (
+      !start ||
+      Math.hypot(event.clientX - start.x, event.clientY - start.y) > 4 ||
+      !this.#pickListener
+    )
+      return;
+    const item = this.#picker.pick(
+      event.clientX,
+      event.clientY,
+      this.element.getBoundingClientRect(),
+      this.#camera,
+      this.#geometryAdapter,
+      this.#objects,
+      this.#selectionMode,
+    );
+    this.#pickListener(item, event.shiftKey);
+  };
 
   #initializeTransformControls(): void {
     if (!this.#renderer) return;
