@@ -24,6 +24,13 @@ test("shows the empty editor shell", async ({ page }) => {
   await page.getByRole("button", { name: "Edge" }).click();
   await page.keyboard.press("ControlOrMeta+A");
   await expect(page.getByText("選択: 12")).toBeVisible();
+  await page.getByRole("button", { name: "Face" }).click();
+  await page.keyboard.press("ControlOrMeta+A");
+  await page.keyboard.press("Delete");
+  await expect(page.getByText("面: 0")).toBeVisible();
+  await page.getByRole("button", { name: "元に戻す" }).click();
+  await expect(page.getByText("面: 6")).toBeVisible();
+  await expect(page.getByText("選択: 6")).toBeVisible();
   await page.getByRole("button", { name: "Box 1", exact: true }).click();
   await page.getByRole("button", { name: "移動" }).click();
   await expect(page.getByRole("button", { name: "移動" })).toHaveClass(

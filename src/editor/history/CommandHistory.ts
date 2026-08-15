@@ -14,16 +14,18 @@ export class CommandHistory {
     this.#undoStack.push(command);
     this.#redoStack.length = 0;
   }
-  undo(document: ModelDocument): void {
+  undo(document: ModelDocument): EditorCommand | undefined {
     const command = this.#undoStack.pop();
-    if (!command) return;
+    if (!command) return undefined;
     command.undo(document);
     this.#redoStack.push(command);
+    return command;
   }
-  redo(document: ModelDocument): void {
+  redo(document: ModelDocument): EditorCommand | undefined {
     const command = this.#redoStack.pop();
-    if (!command) return;
+    if (!command) return undefined;
     command.redo(document);
     this.#undoStack.push(command);
+    return command;
   }
 }

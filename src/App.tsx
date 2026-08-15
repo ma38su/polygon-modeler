@@ -21,6 +21,7 @@ import type { TransformMode } from "./viewport/Viewport";
 import { useEditor, useEditorSnapshot } from "./app/useEditor";
 import { useEditorShortcuts } from "./app/shortcuts/useEditorShortcuts";
 import { TransformInspector } from "./ui/inspector/TransformInspector";
+import { ElementTransformPanel } from "./ui/inspector/ElementTransformPanel";
 import "./App.css";
 
 type Capability = "checking" | "webgpu" | "webgl2" | "unsupported";
@@ -143,7 +144,7 @@ export default function App() {
             type="button"
             className="tool-button"
             disabled={snapshot.selectedObjectIds.size === 0}
-            onClick={() => editor.deleteSelectedObjects()}
+            onClick={() => editor.deleteSelectedElements()}
           >
             <Trash2 aria-hidden="true" />
             削除
@@ -248,7 +249,10 @@ export default function App() {
           </section>
           <section aria-labelledby="inspector-title">
             <h2 id="inspector-title">インスペクター</h2>
-            {selectedObject ? (
+            {snapshot.selectionMode !== "object" &&
+            snapshot.selectionItems.length ? (
+              <ElementTransformPanel editor={editor} />
+            ) : selectedObject ? (
               <TransformInspector editor={editor} object={selectedObject} />
             ) : (
               <div className="empty-state">オブジェクトを選択してください</div>

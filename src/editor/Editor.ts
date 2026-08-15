@@ -1,6 +1,13 @@
 import { ModelDocument } from "./document/ModelDocument";
 import { ModelObject } from "./document/ModelObject";
-import type { EditorSnapshot, ObjectId } from "./document/types";
+import type {
+  EdgeId,
+  EditorSnapshot,
+  FaceId,
+  ObjectId,
+  VertexId,
+  Vector3Value,
+} from "./document/types";
 import { createBoxMesh } from "./mesh/primitives/box";
 import { createPlaneMesh } from "./mesh/primitives/plane";
 import { createCylinderMesh } from "./mesh/primitives/cylinder";
@@ -18,6 +25,10 @@ import {
   type SelectionItem,
   type SelectionMode,
 } from "./selection/SelectionManager";
+import { EditMeshCommand } from "./commands/EditMeshCommand";
+import { CompositeCommand } from "./commands/CompositeCommand";
+import type { EditorCommand } from "./commands/EditorCommand";
+import type { SelectionSnapshot } from "./selection/SelectionManager";
 type Listener = () => void;
 export class Editor {
   readonly document = new ModelDocument();
@@ -25,6 +36,10 @@ export class Editor {
   readonly #selectedObjectIds = new Set<ObjectId>();
   readonly history = new CommandHistory();
   readonly selection = new SelectionManager();
+  readonly #selectionHistory = new WeakMap<
+    EditorCommand,
+    { before: SelectionSnapshot; after: SelectionSnapshot }
+  >();
   #nextObjectId = 1;
   #revision = 0;
   #snapshot: EditorSnapshot = this.#createSnapshot();
@@ -130,21 +145,189 @@ export class Editor {
     );
     this.#commit();
   }
+  translateSelected(delta: Vector3Value): void {
+    const commands: EditMeshCommand[] = [];
+    for (const objectId of new Set(
+      this.selection.items.map((item) => item.objectId),
+    )) {
+      const object = this.document.getObject(objectId);
+      if (!object) continue;
+      const ids = this.#selectedVertices(objectId);
+      const after = object.mesh.clone();
+      after.transformVertices(ids, (position) => ({
+        x: position.x + delta.x,
+        y: position.y + delta.y,
+        z: position.z + delta.z,
+      }));
+      commands.push(
+        new EditMeshCommand("要素を移動", objectId, object.mesh, after),
+      );
+    }
+    if (commands.length) {
+      this.history.execute(
+        new CompositeCommand("要素を移動", commands),
+        this.document,
+      );
+      this.#commit();
+    }
+  }
+  scaleSelected(scale: Vector3Value): void {
+    const pivot = this.#selectionPivot();
+    this.#transformSelected("要素を拡大縮小", (position) => ({
+      x: pivot.x + (position.x - pivot.x) * scale.x,
+      y: pivot.y + (position.y - pivot.y) * scale.y,
+      z: pivot.z + (position.z - pivot.z) * scale.z,
+    }));
+  }
+  rotateSelected(rotation: Vector3Value): void {
+    const pivot = this.#selectionPivot();
+    const [cx, sx, cy, sy, cz, sz] = [
+      Math.cos(rotation.x),
+      Math.sin(rotation.x),
+      Math.cos(rotation.y),
+      Math.sin(rotation.y),
+      Math.cos(rotation.z),
+      Math.sin(rotation.z),
+    ];
+    this.#transformSelected("要素を回転", (position) => {
+      let x = position.x - pivot.x;
+      let y = position.y - pivot.y;
+      let z = position.z - pivot.z;
+      [y, z] = [y * cx - z * sx, y * sx + z * cx];
+      [x, z] = [x * cy + z * sy, -x * sy + z * cy];
+      [x, y] = [x * cz - y * sz, x * sz + y * cz];
+      return { x: x + pivot.x, y: y + pivot.y, z: z + pivot.z };
+    });
+  }
+  deleteSelectedElements(): void {
+    if (this.selection.mode === "object") {
+      this.deleteSelectedObjects();
+      return;
+    }
+    const commands: EditMeshCommand[] = [];
+    for (const objectId of new Set(
+      this.selection.items.map((item) => item.objectId),
+    )) {
+      const object = this.document.getObject(objectId);
+      if (!object) continue;
+      const after = object.mesh.clone();
+      for (const item of this.selection.items.filter(
+        (candidate) => candidate.objectId === objectId,
+      )) {
+        if (this.selection.mode === "vertex")
+          after.deleteVertex(item.elementId as VertexId);
+        else if (this.selection.mode === "edge")
+          after.deleteEdge(item.elementId as EdgeId);
+        else after.deleteFace(item.elementId as FaceId);
+      }
+      commands.push(
+        new EditMeshCommand("要素を削除", objectId, object.mesh, after),
+      );
+    }
+    if (commands.length) {
+      const command = new CompositeCommand("要素を削除", commands);
+      const before = this.selection.snapshot();
+      this.history.execute(command, this.document);
+      this.selection.clear();
+      this.#selectedObjectIds.clear();
+      this.#selectionHistory.set(command, {
+        before,
+        after: this.selection.snapshot(),
+      });
+      this.#commit();
+    }
+  }
+  #transformSelected(
+    label: string,
+    transform: (position: Vector3Value) => Vector3Value,
+  ): void {
+    const commands: EditMeshCommand[] = [];
+    for (const objectId of new Set(
+      this.selection.items.map((item) => item.objectId),
+    )) {
+      const object = this.document.getObject(objectId);
+      if (!object) continue;
+      const after = object.mesh.clone();
+      after.transformVertices(this.#selectedVertices(objectId), transform);
+      commands.push(new EditMeshCommand(label, objectId, object.mesh, after));
+    }
+    if (commands.length) {
+      this.history.execute(
+        new CompositeCommand(label, commands),
+        this.document,
+      );
+      this.#commit();
+    }
+  }
+  #selectionPivot(): Vector3Value {
+    const points = [];
+    for (const objectId of new Set(
+      this.selection.items.map((item) => item.objectId),
+    )) {
+      const object = this.document.getObject(objectId);
+      if (object)
+        for (const id of this.#selectedVertices(objectId))
+          points.push(object.mesh.vertices.get(id)!.position);
+    }
+    if (!points.length) return { x: 0, y: 0, z: 0 };
+    return points.reduce(
+      (sum, point) => ({
+        x: sum.x + point.x / points.length,
+        y: sum.y + point.y / points.length,
+        z: sum.z + point.z / points.length,
+      }),
+      { x: 0, y: 0, z: 0 },
+    );
+  }
+  #selectedVertices(objectId: ObjectId): Set<VertexId> {
+    const result = new Set<VertexId>();
+    const object = this.document.getObject(objectId);
+    if (!object) return result;
+    for (const item of this.selection.items.filter(
+      (candidate) => candidate.objectId === objectId,
+    )) {
+      if (this.selection.mode === "vertex")
+        result.add(item.elementId as VertexId);
+      else if (this.selection.mode === "edge") {
+        const edge = object.mesh.edges.get(item.elementId as EdgeId);
+        if (edge)
+          for (const halfEdgeId of edge.halfEdges) {
+            const halfEdge = object.mesh.halfEdges.get(halfEdgeId)!;
+            result.add(halfEdge.origin);
+            result.add(halfEdge.destination);
+          }
+      } else if (this.selection.mode === "face") {
+        const face = object.mesh.faces.get(item.elementId as FaceId);
+        if (face) for (const id of face.vertices) result.add(id);
+      }
+    }
+    return result;
+  }
   undo(): void {
     if (!this.history.canUndo) return;
-    this.history.undo(this.document);
+    const command = this.history.undo(this.document);
+    const selection = command ? this.#selectionHistory.get(command) : undefined;
+    if (selection) this.#restoreSelection(selection.before);
     this.#reconcileSelection();
     this.#commit();
   }
   redo(): void {
     if (!this.history.canRedo) return;
-    this.history.redo(this.document);
+    const command = this.history.redo(this.document);
+    const selection = command ? this.#selectionHistory.get(command) : undefined;
+    if (selection) this.#restoreSelection(selection.after);
     this.#reconcileSelection();
     this.#commit();
   }
   #reconcileSelection(): void {
     for (const id of this.#selectedObjectIds)
       if (!this.document.getObject(id)) this.#selectedObjectIds.delete(id);
+  }
+  #restoreSelection(snapshot: SelectionSnapshot): void {
+    this.selection.restore(snapshot);
+    this.#selectedObjectIds.clear();
+    for (const item of snapshot.items)
+      this.#selectedObjectIds.add(item.objectId);
   }
   #commit(): void {
     this.#revision += 1;

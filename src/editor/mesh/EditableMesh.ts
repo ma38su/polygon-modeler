@@ -43,6 +43,69 @@ export class EditableMesh {
   get revision() {
     return this.#revision;
   }
+  clone(): EditableMesh {
+    const copy = new EditableMesh();
+    for (const [id, vertex] of this.vertices)
+      copy.vertices.set(id, { ...vertex, position: { ...vertex.position } });
+    for (const [id, halfEdge] of this.halfEdges)
+      copy.halfEdges.set(id, { ...halfEdge });
+    for (const [id, edge] of this.edges)
+      copy.edges.set(id, { ...edge, halfEdges: [...edge.halfEdges] });
+    for (const [id, face] of this.faces)
+      copy.faces.set(id, { ...face, vertices: [...face.vertices] });
+    copy.#nextVertex = this.#nextVertex;
+    copy.#nextHalfEdge = this.#nextHalfEdge;
+    copy.#nextEdge = this.#nextEdge;
+    copy.#nextFace = this.#nextFace;
+    copy.#revision = this.#revision;
+    return copy;
+  }
+  replaceWith(source: EditableMesh): void {
+    this.vertices.clear();
+    this.halfEdges.clear();
+    this.edges.clear();
+    this.faces.clear();
+    const copy = source.clone();
+    for (const [id, value] of copy.vertices) this.vertices.set(id, value);
+    for (const [id, value] of copy.halfEdges) this.halfEdges.set(id, value);
+    for (const [id, value] of copy.edges) this.edges.set(id, value);
+    for (const [id, value] of copy.faces) this.faces.set(id, value);
+    this.#nextVertex = copy.#nextVertex;
+    this.#nextHalfEdge = copy.#nextHalfEdge;
+    this.#nextEdge = copy.#nextEdge;
+    this.#nextFace = copy.#nextFace;
+    this.#revision = copy.#revision + 1;
+  }
+  transformVertices(
+    ids: ReadonlySet<VertexId>,
+    transform: (position: Vector3Value) => Vector3Value,
+  ): void {
+    for (const id of ids) {
+      const vertex = this.vertices.get(id);
+      if (vertex) vertex.position = transform(vertex.position);
+    }
+    this.#revision += 1;
+  }
+  deleteEdge(id: EdgeId): void {
+    const edge = this.edges.get(id);
+    if (!edge) return;
+    const faces = new Set(
+      edge.halfEdges.map((halfEdgeId) => this.halfEdges.get(halfEdgeId)!.face),
+    );
+    for (const face of faces) this.deleteFace(face);
+  }
+  deleteVertex(id: VertexId): void {
+    const faces = new Set(
+      [...this.halfEdges.values()]
+        .filter(
+          (halfEdge) => halfEdge.origin === id || halfEdge.destination === id,
+        )
+        .map((halfEdge) => halfEdge.face),
+    );
+    for (const face of faces) this.deleteFace(face);
+    this.vertices.delete(id);
+    this.#revision += 1;
+  }
 
   static fromPolygons(
     positions: readonly Vector3Value[],

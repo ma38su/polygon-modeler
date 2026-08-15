@@ -26,7 +26,7 @@ export function useEditorShortcuts(editor: Editor): void {
         editor.setSelectionMode(modes[event.key as keyof typeof modes]);
       } else if (event.key === "Delete" || event.key === "Backspace") {
         event.preventDefault();
-        editor.deleteSelectedObjects();
+        editor.deleteSelectedElements();
       }
     };
     window.addEventListener("keydown", onKeyDown);

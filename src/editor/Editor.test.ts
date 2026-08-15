@@ -37,4 +37,34 @@ describe("Editor", () => {
     editor.clearSelection();
     expect(editor.getSnapshot().selectionItems).toHaveLength(0);
   });
+  it("transforms shared element vertices once and restores them with undo", () => {
+    const editor = new Editor();
+    const objectId = editor.createBox();
+    editor.setSelectionMode("face");
+    const faceId = editor.getSnapshot().objects[0]!.mesh.faceIds[0]!;
+    editor.selectElement({ objectId, elementId: faceId });
+    editor.translateSelected({ x: 2, y: 0, z: 0 });
+    const moved = editor.getSnapshot().objects[0]!.mesh.positions;
+    expect(
+      moved.filter((_, index) => index % 3 === 0 && moved[index] === 1),
+    ).toHaveLength(4);
+    editor.undo();
+    expect(editor.getSnapshot().objects[0]!.mesh.positions[0]).toBe(-1);
+  });
+  it("restores topology and selection when element deletion is undone", () => {
+    const editor = new Editor();
+    const objectId = editor.createBox();
+    editor.setSelectionMode("face");
+    const faceId = editor.getSnapshot().objects[0]!.mesh.faceIds[0]!;
+    editor.selectElement({ objectId, elementId: faceId });
+    editor.deleteSelectedElements();
+    expect(editor.getSnapshot().objects[0]!.mesh.faces).toHaveLength(5);
+    expect(editor.getSnapshot().selectionItems).toHaveLength(0);
+    editor.undo();
+    expect(editor.getSnapshot().objects[0]!.mesh.faces).toHaveLength(6);
+    expect(editor.getSnapshot().selectionItems[0]?.elementId).toBe(faceId);
+    editor.redo();
+    expect(editor.getSnapshot().objects[0]!.mesh.faces).toHaveLength(5);
+    expect(editor.getSnapshot().selectionItems).toHaveLength(0);
+  });
 });

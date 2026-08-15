@@ -296,6 +296,26 @@ h2 {
   padding: 0;
   border: 0;
 }
+.element-transform fieldset {
+  margin: 0 0 12px;
+  padding: 0;
+  border: 0;
+}
+.element-transform legend {
+  margin-bottom: 6px;
+  color: var(--text-muted);
+  font-size: 11px;
+}
+.element-transform fieldset > button {
+  width: 100%;
+  margin-top: 5px;
+  padding: 5px;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  color: var(--text-primary);
+  background: var(--surface-3);
+  font-size: 11px;
+}
 .transform-inspector legend {
   margin-bottom: 6px;
   color: var(--text-muted);

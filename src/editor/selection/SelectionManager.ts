@@ -5,6 +5,10 @@ export interface SelectionItem {
   readonly objectId: ObjectId;
   readonly elementId: ElementId;
 }
+export interface SelectionSnapshot {
+  readonly mode: SelectionMode;
+  readonly items: readonly SelectionItem[];
+}
 const keyOf = (item: SelectionItem) => `${item.objectId}:${item.elementId}`;
 export class SelectionManager {
   #mode: SelectionMode = "object";
@@ -43,5 +47,13 @@ export class SelectionManager {
   }
   has(item: SelectionItem) {
     return this.#items.has(keyOf(item));
+  }
+  snapshot(): SelectionSnapshot {
+    return { mode: this.#mode, items: this.items };
+  }
+  restore(snapshot: SelectionSnapshot): void {
+    this.#mode = snapshot.mode;
+    this.#items.clear();
+    for (const item of snapshot.items) this.#items.set(keyOf(item), item);
   }
 }

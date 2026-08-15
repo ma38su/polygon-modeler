@@ -31,4 +31,14 @@ describe("SelectionManager", () => {
     s.removeObject(objectId);
     expect(s.items).toHaveLength(0);
   });
+  it("restores mode and items from a snapshot", () => {
+    const selection = new SelectionManager();
+    selection.setMode("vertex");
+    selection.selectAll([vertex("v-1"), vertex("v-2")]);
+    const snapshot = selection.snapshot();
+    selection.setMode("face");
+    selection.restore(snapshot);
+    expect(selection.mode).toBe("vertex");
+    expect(selection.items).toEqual([vertex("v-1"), vertex("v-2")]);
+  });
 });
