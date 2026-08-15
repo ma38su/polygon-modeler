@@ -17,7 +17,10 @@ import {
 } from "lucide-react";
 import { ViewportCanvas } from "./viewport/ViewportCanvas";
 import type { ViewportStatus } from "./viewport/Viewport";
+import type { TransformMode } from "./viewport/Viewport";
 import { useEditor, useEditorSnapshot } from "./app/useEditor";
+import { useEditorShortcuts } from "./app/shortcuts/useEditorShortcuts";
+import { TransformInspector } from "./ui/inspector/TransformInspector";
 import "./App.css";
 
 type Capability = "checking" | "webgpu" | "webgl2" | "unsupported";
@@ -31,15 +34,26 @@ const labels: Record<Capability, string> = {
 export default function App() {
   const editor = useEditor();
   const snapshot = useEditorSnapshot();
+  useEditorShortcuts(editor);
+  const selectedObject = snapshot.objects.find((object) =>
+    snapshot.selectedObjectIds.has(object.id),
+  );
   const [capability, setCapability] = useState<Capability>("checking");
   const [projection, setProjection] = useState<"perspective" | "orthographic">(
     "perspective",
   );
+  const [transformMode, setTransformMode] =
+    useState<TransformMode>("translate");
   const handleViewportStatus = useCallback((status: ViewportStatus) => {
     setCapability(
       status.error ? "unsupported" : (status.backend ?? "checking"),
     );
   }, []);
+  const handleTransformCommit = useCallback(
+    (...args: Parameters<typeof editor.transformObject>) =>
+      editor.transformObject(...args),
+    [editor],
+  );
 
   return (
     <main className="editor-shell">
@@ -57,11 +71,19 @@ export default function App() {
           ))}
         </nav>
         <div className="history-actions" aria-label="履歴操作">
-          <button type="button" disabled>
+          <button
+            type="button"
+            disabled={!snapshot.canUndo}
+            onClick={() => editor.undo()}
+          >
             <Undo2 aria-hidden="true" />
             元に戻す
           </button>
-          <button type="button" disabled>
+          <button
+            type="button"
+            disabled={!snapshot.canRedo}
+            onClick={() => editor.redo()}
+          >
             <Redo2 aria-hidden="true" />
             やり直す
           </button>
@@ -72,15 +94,15 @@ export default function App() {
         <aside className="tool-panel" aria-label="ツール">
           <h2>ツール</h2>
           {[
-            { label: "選択", icon: MousePointer2 },
-            { label: "移動", icon: Move3D },
-            { label: "回転", icon: Rotate3D },
-            { label: "拡大縮小", icon: Expand },
-          ].map(({ label, icon: Icon }, index) => (
+            { label: "選択", icon: MousePointer2, mode: "translate" as const },
+            { label: "移動", icon: Move3D, mode: "translate" as const },
+            { label: "回転", icon: Rotate3D, mode: "rotate" as const },
+            { label: "拡大縮小", icon: Expand, mode: "scale" as const },
+          ].map(({ label, icon: Icon, mode }, index) => (
             <button
               type="button"
-              className={`tool-button${index === 0 ? " active" : ""}`}
-              disabled={index !== 0}
+              className={`tool-button${index > 0 && transformMode === mode ? " active" : ""}`}
+              onClick={() => setTransformMode(mode)}
               key={label}
             >
               <Icon aria-hidden="true" />
@@ -131,6 +153,8 @@ export default function App() {
             onStatusChange={handleViewportStatus}
             objects={snapshot.objects}
             selectedObjectIds={snapshot.selectedObjectIds}
+            transformMode={transformMode}
+            onTransformCommit={handleTransformCommit}
           />
         </section>
 
@@ -182,7 +206,11 @@ export default function App() {
           </section>
           <section aria-labelledby="inspector-title">
             <h2 id="inspector-title">インスペクター</h2>
-            <div className="empty-state">オブジェクトを選択してください</div>
+            {selectedObject ? (
+              <TransformInspector editor={editor} object={selectedObject} />
+            ) : (
+              <div className="empty-state">オブジェクトを選択してください</div>
+            )}
           </section>
         </aside>
       </div>

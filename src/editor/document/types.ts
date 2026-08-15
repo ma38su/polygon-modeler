@@ -24,4 +24,6 @@ export interface EditorSnapshot {
   readonly objects: readonly ModelObjectSnapshot[];
   readonly selectedObjectIds: ReadonlySet<ObjectId>;
   readonly revision: number;
+  readonly canUndo: boolean;
+  readonly canRedo: boolean;
 }

@@ -51,6 +51,10 @@ export class RenderGeometryAdapter {
   dispose(): void {
     for (const [id, mesh] of this.#meshes) this.#remove(id, mesh);
   }
+
+  getMesh(id: ObjectId): Mesh | undefined {
+    return this.#meshes.get(id);
+  }
   #createMesh(object: ModelObjectSnapshot): Mesh {
     const geometry = new BufferGeometry();
     geometry.setAttribute(

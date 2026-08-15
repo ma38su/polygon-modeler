@@ -1,6 +1,11 @@
 import { useEffect, useRef, useState } from "react";
 import { AlertTriangle, RefreshCw } from "lucide-react";
-import { Viewport, type ViewportStatus } from "./Viewport";
+import {
+  Viewport,
+  type TransformCommitListener,
+  type TransformMode,
+  type ViewportStatus,
+} from "./Viewport";
 import type { ModelObjectSnapshot, ObjectId } from "../editor/document/types";
 
 export interface ViewportCanvasProps {
@@ -8,6 +13,8 @@ export interface ViewportCanvasProps {
   projection: "perspective" | "orthographic";
   objects: readonly ModelObjectSnapshot[];
   selectedObjectIds: ReadonlySet<ObjectId>;
+  transformMode: TransformMode;
+  onTransformCommit: TransformCommitListener;
 }
 
 export function ViewportCanvas({
@@ -15,6 +22,8 @@ export function ViewportCanvas({
   projection,
   objects,
   selectedObjectIds,
+  transformMode,
+  onTransformCommit,
 }: ViewportCanvasProps) {
   const hostRef = useRef<HTMLDivElement>(null);
   const viewportRef = useRef<Viewport>(null);
@@ -28,17 +37,22 @@ export function ViewportCanvas({
       onStatusChange(status);
     });
     viewportRef.current = viewport;
+    viewport.setTransformCommitListener(onTransformCommit);
     void viewport.initialize();
     return () => {
       viewportRef.current = null;
       viewport.dispose();
     };
-  }, [onStatusChange]);
+  }, [onStatusChange, onTransformCommit]);
 
   useEffect(() => viewportRef.current?.setProjection(projection), [projection]);
   useEffect(
     () => viewportRef.current?.syncObjects(objects, selectedObjectIds),
     [objects, selectedObjectIds],
+  );
+  useEffect(
+    () => viewportRef.current?.setTransformMode(transformMode),
+    [transformMode],
   );
 
   return (

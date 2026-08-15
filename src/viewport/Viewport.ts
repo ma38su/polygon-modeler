@@ -10,8 +10,13 @@ import {
   type Camera,
 } from "three";
 import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
+import { TransformControls } from "three/examples/jsm/controls/TransformControls.js";
 import type { WebGPURenderer as WebGpuRenderer } from "three/webgpu";
-import type { ModelObjectSnapshot, ObjectId } from "../editor/document/types";
+import type {
+  ModelObjectSnapshot,
+  ObjectId,
+  TransformValue,
+} from "../editor/document/types";
 import { RenderGeometryAdapter } from "./adapters/RenderGeometryAdapter";
 import {
   canUseWebGpu,
@@ -29,6 +34,12 @@ export interface ViewportStatus {
 
 type StatusListener = (status: ViewportStatus) => void;
 type Renderer = WebGLRenderer | WebGpuRenderer;
+export type TransformMode = "translate" | "rotate" | "scale";
+export type TransformCommitListener = (
+  id: ObjectId,
+  before: TransformValue,
+  after: TransformValue,
+) => void;
 
 export class Viewport {
   readonly element: HTMLElement;
@@ -48,6 +59,11 @@ export class Viewport {
   #projection: Projection = "perspective";
   #renderer?: Renderer;
   #controls?: OrbitControls;
+  #transformControls?: TransformControls;
+  #transformMode: TransformMode = "translate";
+  #transformCommitListener?: TransformCommitListener;
+  #selectedObjectId?: ObjectId;
+  #transformBefore?: TransformValue;
   #animationFrame?: number;
   #disposed = false;
 
@@ -92,6 +108,7 @@ export class Viewport {
 
     if (this.#disposed) return;
     this.#initializeControls();
+    this.#initializeTransformControls();
     this.#resize();
     this.#render();
   }
@@ -103,7 +120,10 @@ export class Viewport {
     this.#camera.position.copy(previous.position);
     this.#camera.quaternion.copy(previous.quaternion);
     this.#controls?.dispose();
+    this.#disposeTransformControls();
     this.#initializeControls();
+    this.#initializeTransformControls();
+    this.#attachSelectedObject();
     this.#resize();
     this.#emitStatus();
   }
@@ -113,12 +133,24 @@ export class Viewport {
     selectedIds: ReadonlySet<ObjectId>,
   ): void {
     this.#geometryAdapter.sync(objects, selectedIds);
+    this.#selectedObjectId = selectedIds.values().next().value;
+    this.#attachSelectedObject();
+  }
+
+  setTransformMode(mode: TransformMode): void {
+    this.#transformMode = mode;
+    this.#transformControls?.setMode(mode);
+  }
+
+  setTransformCommitListener(listener: TransformCommitListener): void {
+    this.#transformCommitListener = listener;
   }
 
   dispose(): void {
     this.#disposed = true;
     this.#resizeObserver.disconnect();
     this.#controls?.dispose();
+    this.#disposeTransformControls();
     if (this.#animationFrame !== undefined) {
       cancelAnimationFrame(this.#animationFrame);
     }
@@ -167,6 +199,67 @@ export class Viewport {
     this.#controls.enableDamping = true;
     this.#controls.screenSpacePanning = true;
     this.#controls.update();
+  }
+
+  #initializeTransformControls(): void {
+    if (!this.#renderer) return;
+    const controls = new TransformControls(
+      this.#camera,
+      this.#renderer.domElement,
+    );
+    controls.setMode(this.#transformMode);
+    controls.addEventListener("dragging-changed", (event) => {
+      if (this.#controls) this.#controls.enabled = !event.value;
+    });
+    controls.addEventListener("mouseDown", this.#handleTransformStart);
+    controls.addEventListener("mouseUp", this.#handleTransformEnd);
+    this.#transformControls = controls;
+    this.#scene.add(controls.getHelper());
+  }
+
+  #disposeTransformControls(): void {
+    if (!this.#transformControls) return;
+    this.#transformControls.detach();
+    this.#scene.remove(this.#transformControls.getHelper());
+    this.#transformControls.dispose();
+    this.#transformControls = undefined;
+  }
+
+  #attachSelectedObject(): void {
+    if (!this.#transformControls) return;
+    const mesh = this.#selectedObjectId
+      ? this.#geometryAdapter.getMesh(this.#selectedObjectId)
+      : undefined;
+    if (mesh) this.#transformControls.attach(mesh);
+    else this.#transformControls.detach();
+  }
+
+  #handleTransformStart = (): void => {
+    const mesh = this.#selectedObjectId
+      ? this.#geometryAdapter.getMesh(this.#selectedObjectId)
+      : undefined;
+    if (mesh) this.#transformBefore = this.#readTransform(mesh);
+  };
+
+  #handleTransformEnd = (): void => {
+    const id = this.#selectedObjectId;
+    const mesh = id ? this.#geometryAdapter.getMesh(id) : undefined;
+    if (id && mesh && this.#transformBefore) {
+      this.#transformCommitListener?.(
+        id,
+        this.#transformBefore,
+        this.#readTransform(mesh),
+      );
+    }
+    this.#transformBefore = undefined;
+  };
+
+  #readTransform(mesh: import("three").Mesh): TransformValue {
+    return {
+      position: { x: mesh.position.x, y: mesh.position.y, z: mesh.position.z },
+      rotation: { x: mesh.rotation.x, y: mesh.rotation.y, z: mesh.rotation.z },
+      scale: { x: mesh.scale.x, y: mesh.scale.y, z: mesh.scale.z },
+    };
   }
 
   #resize(): void {

@@ -2,11 +2,19 @@ import { ModelDocument } from "./document/ModelDocument";
 import { ModelObject } from "./document/ModelObject";
 import type { EditorSnapshot, ObjectId } from "./document/types";
 import { createBoxMesh } from "./mesh/primitives/box";
+import { CommandHistory } from "./history/CommandHistory";
+import {
+  CreateObjectCommand,
+  DeleteObjectCommand,
+  TransformObjectCommand,
+} from "./commands/objectCommands";
+import type { TransformValue } from "./document/types";
 type Listener = () => void;
 export class Editor {
   readonly document = new ModelDocument();
   readonly #listeners = new Set<Listener>();
   readonly #selectedObjectIds = new Set<ObjectId>();
+  readonly history = new CommandHistory();
   #nextObjectId = 1;
   #revision = 0;
   #snapshot: EditorSnapshot = this.#createSnapshot();
@@ -18,9 +26,8 @@ export class Editor {
   createBox(): ObjectId {
     const sequence = this.#nextObjectId++;
     const id = `object-${sequence}` as ObjectId;
-    this.document.addObject(
-      new ModelObject(id, `Box ${sequence}`, createBoxMesh()),
-    );
+    const object = new ModelObject(id, `Box ${sequence}`, createBoxMesh());
+    this.history.execute(new CreateObjectCommand(object), this.document);
     this.#selectedObjectIds.clear();
     this.#selectedObjectIds.add(id);
     this.#commit();
@@ -28,7 +35,10 @@ export class Editor {
   }
   deleteSelectedObjects(): void {
     if (this.#selectedObjectIds.size === 0) return;
-    for (const id of this.#selectedObjectIds) this.document.removeObject(id);
+    this.history.execute(
+      new DeleteObjectCommand([...this.#selectedObjectIds]),
+      this.document,
+    );
     this.#selectedObjectIds.clear();
     this.#commit();
   }
@@ -44,6 +54,31 @@ export class Editor {
     object.visible = visible;
     this.#commit();
   }
+  transformObject(id: ObjectId, transform: TransformValue): void {
+    const object = this.document.getObject(id);
+    if (!object) return;
+    this.history.execute(
+      new TransformObjectCommand(id, object.transform, transform),
+      this.document,
+    );
+    this.#commit();
+  }
+  undo(): void {
+    if (!this.history.canUndo) return;
+    this.history.undo(this.document);
+    this.#reconcileSelection();
+    this.#commit();
+  }
+  redo(): void {
+    if (!this.history.canRedo) return;
+    this.history.redo(this.document);
+    this.#reconcileSelection();
+    this.#commit();
+  }
+  #reconcileSelection(): void {
+    for (const id of this.#selectedObjectIds)
+      if (!this.document.getObject(id)) this.#selectedObjectIds.delete(id);
+  }
   #commit(): void {
     this.#revision += 1;
     this.#snapshot = this.#createSnapshot();
@@ -54,6 +89,8 @@ export class Editor {
       objects: this.document.toSnapshot(),
       selectedObjectIds: new Set(this.#selectedObjectIds),
       revision: this.#revision,
+      canUndo: this.history.canUndo,
+      canRedo: this.history.canRedo,
     };
   }
 }
