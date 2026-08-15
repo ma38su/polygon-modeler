@@ -29,6 +29,14 @@ import { EditMeshCommand } from "./commands/EditMeshCommand";
 import { CompositeCommand } from "./commands/CompositeCommand";
 import type { EditorCommand } from "./commands/EditorCommand";
 import type { SelectionSnapshot } from "./selection/SelectionManager";
+import {
+  createFace,
+  extrudeFaces,
+  flipFaces,
+  mergeVertices,
+  splitEdge,
+  splitFace,
+} from "./mesh/topologyOperations";
 type Listener = () => void;
 export class Editor {
   readonly document = new ModelDocument();
@@ -236,6 +244,91 @@ export class Editor {
       });
       this.#commit();
     }
+  }
+  extrudeSelectedFaces(distance: number): void {
+    if (this.selection.mode !== "face") return;
+    this.#applyTopology("面を押し出し", (mesh, items) =>
+      extrudeFaces(
+        mesh,
+        new Set(items.map((item) => item.elementId as FaceId)),
+        distance,
+      ),
+    );
+  }
+  splitSelectedElements(): void {
+    if (this.selection.mode !== "face" && this.selection.mode !== "edge")
+      return;
+    this.#applyTopology("要素を分割", (mesh, items) => {
+      const first = items[0];
+      if (!first) return mesh.clone();
+      return this.selection.mode === "face"
+        ? splitFace(mesh, first.elementId as FaceId)
+        : splitEdge(mesh, first.elementId as EdgeId);
+    });
+  }
+  flipSelectedFaces(): void {
+    if (this.selection.mode !== "face") return;
+    this.#applyTopology("面を反転", (mesh, items) =>
+      flipFaces(mesh, new Set(items.map((item) => item.elementId as FaceId))),
+    );
+  }
+  mergeSelectedVertices(): void {
+    if (this.selection.mode !== "vertex") return;
+    this.#applyTopology("頂点を結合", (mesh, items) =>
+      items.length >= 2
+        ? mergeVertices(
+            mesh,
+            items[0]!.elementId as VertexId,
+            items[1]!.elementId as VertexId,
+          )
+        : mesh.clone(),
+    );
+  }
+  createFaceFromSelection(): void {
+    if (this.selection.mode !== "vertex") return;
+    this.#applyTopology("面を生成", (mesh, items) =>
+      createFace(
+        mesh,
+        items.map((item) => item.elementId as VertexId),
+      ),
+    );
+  }
+  #applyTopology(
+    label: string,
+    operation: (
+      mesh: EditableMesh,
+      items: readonly SelectionItem[],
+    ) => EditableMesh,
+  ): void {
+    const commands: EditMeshCommand[] = [];
+    for (const [objectId, items] of this.#selectionGroups()) {
+      const object = this.document.getObject(objectId);
+      if (!object) continue;
+      const after = operation(object.mesh, items);
+      const validation = validateMesh(after);
+      if (!validation.valid) throw new Error(validation.errors.join("\n"));
+      commands.push(new EditMeshCommand(label, objectId, object.mesh, after));
+    }
+    if (!commands.length) return;
+    const command = new CompositeCommand(label, commands);
+    const before = this.selection.snapshot();
+    this.history.execute(command, this.document);
+    this.selection.clear();
+    this.#selectedObjectIds.clear();
+    this.#selectionHistory.set(command, {
+      before,
+      after: this.selection.snapshot(),
+    });
+    this.#commit();
+  }
+  #selectionGroups(): Map<ObjectId, SelectionItem[]> {
+    const groups = new Map<ObjectId, SelectionItem[]>();
+    for (const item of this.selection.items) {
+      const values = groups.get(item.objectId) ?? [];
+      values.push(item);
+      groups.set(item.objectId, values);
+    }
+    return groups;
   }
   #transformSelected(
     label: string,

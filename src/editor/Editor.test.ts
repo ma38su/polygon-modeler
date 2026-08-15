@@ -67,4 +67,19 @@ describe("Editor", () => {
     expect(editor.getSnapshot().objects[0]!.mesh.faces).toHaveLength(5);
     expect(editor.getSnapshot().selectionItems).toHaveLength(0);
   });
+  it("extrudes selected faces as an undoable command", () => {
+    const editor = new Editor();
+    const objectId = editor.createPlane();
+    editor.setSelectionMode("face");
+    const faceId = editor.getSnapshot().objects[0]!.mesh.faceIds[0]!;
+    editor.selectElement({ objectId, elementId: faceId });
+    editor.extrudeSelectedFaces(1);
+    const extruded = editor.getSnapshot().objects[0]!.mesh;
+    expect(extruded.faces).toHaveLength(5);
+    editor.undo();
+    expect(editor.getSnapshot().objects[0]!.mesh.faces).toHaveLength(1);
+    expect(editor.getSnapshot().selectionItems[0]?.elementId).toBe(faceId);
+    editor.redo();
+    expect(editor.getSnapshot().objects[0]!.mesh).toEqual(extruded);
+  });
 });

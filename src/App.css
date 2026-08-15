@@ -316,6 +316,42 @@ h2 {
   background: var(--surface-3);
   font-size: 11px;
 }
+.modeling-actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 5px;
+}
+.modeling-actions legend,
+.modeling-actions .scalar-field {
+  grid-column: 1 / -1;
+}
+.modeling-actions button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  margin-top: 0 !important;
+}
+.modeling-actions button svg {
+  width: 13px;
+  height: 13px;
+}
+.scalar-field {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--text-muted);
+  font-size: 11px;
+}
+.scalar-field input {
+  min-width: 0;
+  width: 100%;
+  padding: 5px;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  color: var(--text-primary);
+  background: var(--surface-0);
+}
 .transform-inspector legend {
   margin-bottom: 6px;
   color: var(--text-muted);

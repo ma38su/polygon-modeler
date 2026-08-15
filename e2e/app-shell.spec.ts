@@ -63,3 +63,27 @@ test("shows the empty editor shell", async ({ page }) => {
     /active/,
   );
 });
+
+test("previews, cancels, commits, and replays a face extrusion", async ({
+  page,
+}) => {
+  await page.goto("/?renderer=webgl2");
+  await page.getByRole("button", { name: "Plane追加" }).click();
+  await page.getByRole("button", { name: "Face" }).click();
+  await page.keyboard.press("ControlOrMeta+A");
+
+  const distance = page.getByLabel("押し出し量");
+  await distance.fill("2");
+  await expect(page.getByText("面: 1")).toBeVisible();
+  await page.getByRole("button", { name: "キャンセル" }).click();
+  await expect(distance).toHaveValue("1");
+  await expect(page.getByText("面: 1")).toBeVisible();
+
+  await distance.fill("0.5");
+  await page.getByRole("button", { name: "押し出し" }).click();
+  await expect(page.getByText("面: 5")).toBeVisible();
+  await page.getByRole("button", { name: "元に戻す" }).click();
+  await expect(page.getByText("面: 1")).toBeVisible();
+  await page.getByRole("button", { name: "やり直す" }).click();
+  await expect(page.getByText("面: 5")).toBeVisible();
+});
