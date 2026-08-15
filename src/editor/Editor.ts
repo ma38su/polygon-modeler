@@ -38,6 +38,7 @@ import {
   splitFace,
 } from "./mesh/topologyOperations";
 import { deserializeProject, serializeProject } from "./formats/projectFormat";
+import type { ImportedMesh } from "./formats/exchangeFormats";
 type Listener = () => void;
 export class Editor {
   readonly document = new ModelDocument();
@@ -66,6 +67,37 @@ export class Editor {
   }
   createCylinder(): ObjectId {
     return this.#createObject("Cylinder", createCylinderMesh());
+  }
+  importMeshes(items: readonly ImportedMesh[]): ObjectId[] {
+    if (!items.length) return [];
+    const objects = items.map((item) => {
+      const validation = validateMesh(item.mesh);
+      if (!validation.valid) throw new Error(validation.errors.join("\n"));
+      const sequence = this.#nextObjectId++;
+      return new ModelObject(
+        `object-${sequence}` as ObjectId,
+        item.name || `Imported ${sequence}`,
+        item.mesh,
+      );
+    });
+    this.history.execute(
+      new CompositeCommand(
+        "メッシュを読み込む",
+        objects.map((object) => new CreateObjectCommand(object)),
+      ),
+      this.document,
+    );
+    this.selection.setMode("object");
+    this.selection.selectAll(
+      objects.map((object) => ({
+        objectId: object.id,
+        elementId: object.id,
+      })),
+    );
+    this.#selectedObjectIds.clear();
+    objects.forEach((object) => this.#selectedObjectIds.add(object.id));
+    this.#commit(true);
+    return objects.map((object) => object.id);
   }
   #createObject(kind: string, mesh: EditableMesh): ObjectId {
     const validation = validateMesh(mesh);

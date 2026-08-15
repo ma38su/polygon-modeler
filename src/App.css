@@ -81,6 +81,15 @@ button {
 .history-actions {
   padding-right: 10px;
 }
+.include-hidden {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  margin-right: 6px;
+  color: var(--text-muted);
+  font-size: 11px;
+  white-space: nowrap;
+}
 button:disabled {
   opacity: 0.4;
 }

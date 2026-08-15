@@ -11,6 +11,7 @@ import {
   FileDown,
   FolderOpen,
   HelpCircle,
+  Import,
   MousePointer2,
   Move3D,
   Plus,
@@ -18,6 +19,7 @@ import {
   Rotate3D,
   RotateCcw,
   Trash2,
+  Upload,
   Undo2,
 } from "lucide-react";
 import { ViewportCanvas } from "./viewport/ViewportCanvas";
@@ -28,6 +30,7 @@ import { useEditorShortcuts } from "./app/shortcuts/useEditorShortcuts";
 import { TransformInspector } from "./ui/inspector/TransformInspector";
 import { ElementTransformPanel } from "./ui/inspector/ElementTransformPanel";
 import { useProjectPersistence } from "./app/useProjectPersistence";
+import { useExchangeFiles } from "./app/useExchangeFiles";
 import "./App.css";
 
 type Capability = "checking" | "webgpu" | "webgl2" | "unsupported";
@@ -51,6 +54,7 @@ export default function App() {
   const [transformMode, setTransformMode] =
     useState<TransformMode>("translate");
   const [showShortcuts, setShowShortcuts] = useState(false);
+  const [includeHidden, setIncludeHidden] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string>();
   const [contextMenu, setContextMenu] = useState<{ x: number; y: number }>();
   const contextMenuRef = useRef<HTMLDivElement>(null);
@@ -59,6 +63,12 @@ export default function App() {
     editor,
     snapshot.revision,
     snapshot.isDirty,
+    setErrorMessage,
+  );
+  const exchange = useExchangeFiles(
+    editor,
+    snapshot.objects,
+    includeHidden,
     setErrorMessage,
   );
   useEditorShortcuts(editor, {
@@ -110,6 +120,18 @@ export default function App() {
             <FolderOpen aria-hidden="true" />
             開く
           </button>
+          <button type="button" onClick={exchange.openPicker}>
+            <Import aria-hidden="true" />
+            3D読込
+          </button>
+          <button type="button" onClick={exchange.exportGlb}>
+            <Upload aria-hidden="true" />
+            GLB出力
+          </button>
+          <button type="button" onClick={exchange.exportStl}>
+            <Upload aria-hidden="true" />
+            STL出力
+          </button>
           <button type="button" onClick={openShortcutHelp}>
             表示
             <ChevronDown aria-hidden="true" />
@@ -122,8 +144,26 @@ export default function App() {
             aria-label="プロジェクトファイルを開く"
             onChange={persistence.openFile}
           />
+          <input
+            ref={exchange.inputRef}
+            className="visually-hidden"
+            type="file"
+            accept=".glb,.stl,model/gltf-binary,model/stl"
+            aria-label="GLBまたはSTLを読み込む"
+            onChange={exchange.importFile}
+          />
         </nav>
         <div className="history-actions" aria-label="履歴操作">
+          <label className="include-hidden">
+            <input
+              type="checkbox"
+              checked={includeHidden}
+              onChange={(event) =>
+                setIncludeHidden(event.currentTarget.checked)
+              }
+            />
+            非表示も出力
+          </label>
           <button type="button" onClick={openShortcutHelp}>
             <HelpCircle aria-hidden="true" />
             ショートカット

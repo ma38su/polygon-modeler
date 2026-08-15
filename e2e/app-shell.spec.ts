@@ -150,3 +150,30 @@ test("offers and restores the IndexedDB autosave", async ({ page }) => {
   ).toBeVisible();
   await expect(page.getByLabel("未保存の変更あり")).toHaveCount(0);
 });
+
+test("exports GLB and STL and imports the STL in print units", async ({
+  page,
+}) => {
+  await page.goto("/?renderer=webgl2");
+  await page.getByRole("button", { name: "Box追加" }).click();
+
+  const glbPromise = page.waitForEvent("download");
+  await page.getByRole("button", { name: "GLB出力" }).click();
+  const glb = await glbPromise;
+  expect(glb.suggestedFilename()).toBe("polygon-model.glb");
+
+  const stlPromise = page.waitForEvent("download");
+  await page.getByRole("button", { name: "STL出力" }).click();
+  const stl = await stlPromise;
+  expect(stl.suggestedFilename()).toBe("polygon-model.stl");
+  const stlPath = await stl.path();
+  expect(stlPath).not.toBeNull();
+
+  await page.getByRole("button", { name: "削除" }).click();
+  await page.getByLabel("GLBまたはSTLを読み込む").setInputFiles(stlPath!);
+  await expect(
+    page.getByRole("button", { name: "STL Mesh", exact: true }),
+  ).toBeVisible();
+  await expect(page.getByText("頂点: 8")).toBeVisible();
+  await expect(page.getByText("面: 12")).toBeVisible();
+});
