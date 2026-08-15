@@ -115,3 +115,38 @@ test("coordinates viewport focus, shortcuts, context menu, and dirty state", asy
     page.getByRole("dialog", { name: "キーボードショートカット" }),
   ).toBeVisible();
 });
+
+test("saves and reloads a project file", async ({ page }) => {
+  await page.goto("/?renderer=webgl2");
+  await page.getByRole("button", { name: "Box追加" }).click();
+  const downloadPromise = page.waitForEvent("download");
+  await page.getByRole("button", { name: "保存" }).click();
+  const download = await downloadPromise;
+  const path = await download.path();
+  expect(path).not.toBeNull();
+  await expect(page.getByLabel("未保存の変更あり")).toHaveCount(0);
+
+  await page.getByRole("button", { name: "削除" }).click();
+  await expect(page.getByText("シーンは空です")).toBeVisible();
+  await page.getByLabel("プロジェクトファイルを開く").setInputFiles(path!);
+  await expect(
+    page.getByRole("button", { name: "Box 1", exact: true }),
+  ).toBeVisible();
+  await expect(page.getByText("頂点: 8")).toBeVisible();
+  await expect(page.getByLabel("未保存の変更あり")).toHaveCount(0);
+});
+
+test("offers and restores the IndexedDB autosave", async ({ page }) => {
+  await page.goto("/?renderer=webgl2");
+  await page.getByRole("button", { name: "Plane追加" }).click();
+  await page.waitForTimeout(700);
+  await page.reload();
+  await expect(
+    page.getByRole("dialog", { name: "自動保存を復元" }),
+  ).toBeVisible();
+  await page.getByRole("button", { name: "復元" }).click();
+  await expect(
+    page.getByRole("button", { name: "Plane 1", exact: true }),
+  ).toBeVisible();
+  await expect(page.getByLabel("未保存の変更あり")).toHaveCount(0);
+});

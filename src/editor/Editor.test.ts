@@ -82,4 +82,26 @@ describe("Editor", () => {
     editor.redo();
     expect(editor.getSnapshot().objects[0]!.mesh).toEqual(extruded);
   });
+  it("loads a project cleanly and starts a new undo history", () => {
+    const sourceEditor = new Editor();
+    const id = sourceEditor.createBox();
+    sourceEditor.transformObject(id, {
+      position: { x: 4, y: 5, z: 6 },
+      rotation: { x: 0, y: 0.5, z: 0 },
+      scale: { x: 2, y: 2, z: 2 },
+    });
+    const source = sourceEditor.serializeProject();
+
+    const editor = new Editor();
+    editor.createPlane();
+    editor.loadProject(source);
+    expect(editor.getSnapshot().objects).toEqual(
+      sourceEditor.getSnapshot().objects,
+    );
+    expect(editor.getSnapshot().isDirty).toBe(false);
+    expect(editor.getSnapshot().canUndo).toBe(false);
+    editor.createPlane();
+    expect(editor.getSnapshot().canUndo).toBe(true);
+    expect(editor.getSnapshot().isDirty).toBe(true);
+  });
 });

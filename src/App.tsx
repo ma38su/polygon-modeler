@@ -8,12 +8,15 @@ import {
   Expand,
   Eye,
   EyeOff,
+  FileDown,
+  FolderOpen,
   HelpCircle,
   MousePointer2,
   Move3D,
   Plus,
   Redo2,
   Rotate3D,
+  RotateCcw,
   Trash2,
   Undo2,
 } from "lucide-react";
@@ -24,6 +27,7 @@ import { useEditor, useEditorSnapshot } from "./app/useEditor";
 import { useEditorShortcuts } from "./app/shortcuts/useEditorShortcuts";
 import { TransformInspector } from "./ui/inspector/TransformInspector";
 import { ElementTransformPanel } from "./ui/inspector/ElementTransformPanel";
+import { useProjectPersistence } from "./app/useProjectPersistence";
 import "./App.css";
 
 type Capability = "checking" | "webgpu" | "webgl2" | "unsupported";
@@ -51,6 +55,12 @@ export default function App() {
   const [contextMenu, setContextMenu] = useState<{ x: number; y: number }>();
   const contextMenuRef = useRef<HTMLDivElement>(null);
   const openShortcutHelp = useCallback(() => setShowShortcuts(true), []);
+  const persistence = useProjectPersistence(
+    editor,
+    snapshot.revision,
+    snapshot.isDirty,
+    setErrorMessage,
+  );
   useEditorShortcuts(editor, {
     setTransformMode,
     showHelp: openShortcutHelp,
@@ -85,19 +95,33 @@ export default function App() {
         <div className="brand" aria-label="Polygon Modeler">
           <Box className="brand-mark" aria-hidden="true" />
           Polygon Modeler
-          {snapshot.revision > 0 && (
+          {snapshot.isDirty && (
             <span className="dirty-indicator" aria-label="未保存の変更あり">
               ●
             </span>
           )}
         </div>
         <nav className="menu-bar" aria-label="メインメニュー">
-          {["ファイル", "編集", "表示"].map((menu) => (
-            <button type="button" key={menu}>
-              {menu}
-              <ChevronDown aria-hidden="true" />
-            </button>
-          ))}
+          <button type="button" onClick={persistence.saveFile}>
+            <FileDown aria-hidden="true" />
+            保存
+          </button>
+          <button type="button" onClick={persistence.openFilePicker}>
+            <FolderOpen aria-hidden="true" />
+            開く
+          </button>
+          <button type="button" onClick={openShortcutHelp}>
+            表示
+            <ChevronDown aria-hidden="true" />
+          </button>
+          <input
+            ref={persistence.fileInputRef}
+            className="visually-hidden"
+            type="file"
+            accept=".polyproj,application/json"
+            aria-label="プロジェクトファイルを開く"
+            onChange={persistence.openFile}
+          />
         </nav>
         <div className="history-actions" aria-label="履歴操作">
           <button type="button" onClick={openShortcutHelp}>
@@ -415,6 +439,30 @@ export default function App() {
                 </div>
               ))}
             </dl>
+          </section>
+        </div>
+      )}
+      {persistence.recoverySource && (
+        <div className="dialog-backdrop" role="presentation">
+          <section
+            className="shortcut-dialog recovery-dialog"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="recovery-title"
+          >
+            <header>
+              <h2 id="recovery-title">自動保存を復元</h2>
+              <RotateCcw aria-hidden="true" />
+            </header>
+            <p>前回の編集内容が見つかりました。復元しますか？</p>
+            <div className="dialog-actions">
+              <button type="button" onClick={persistence.discardAutosave}>
+                破棄
+              </button>
+              <button type="button" onClick={persistence.restoreAutosave}>
+                復元
+              </button>
+            </div>
           </section>
         </div>
       )}

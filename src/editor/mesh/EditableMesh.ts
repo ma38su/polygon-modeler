@@ -29,6 +29,19 @@ export interface MeshFace {
   readonly halfEdge: HalfEdgeId;
   readonly vertices: readonly VertexId[];
 }
+export interface EditableMeshArchive {
+  readonly vertices: readonly MeshVertex[];
+  readonly halfEdges: readonly MeshHalfEdge[];
+  readonly edges: readonly MeshEdge[];
+  readonly faces: readonly MeshFace[];
+  readonly nextIds: {
+    readonly vertex: number;
+    readonly halfEdge: number;
+    readonly edge: number;
+    readonly face: number;
+  };
+  readonly revision: number;
+}
 
 export class EditableMesh {
   readonly vertices = new Map<VertexId, MeshVertex>();
@@ -59,6 +72,52 @@ export class EditableMesh {
     copy.#nextFace = this.#nextFace;
     copy.#revision = this.#revision;
     return copy;
+  }
+  toArchive(): EditableMeshArchive {
+    return {
+      vertices: [...this.vertices.values()].map((vertex) => ({
+        ...vertex,
+        position: { ...vertex.position },
+      })),
+      halfEdges: [...this.halfEdges.values()].map((halfEdge) => ({
+        ...halfEdge,
+      })),
+      edges: [...this.edges.values()].map((edge) => ({
+        ...edge,
+        halfEdges: [...edge.halfEdges],
+      })),
+      faces: [...this.faces.values()].map((face) => ({
+        ...face,
+        vertices: [...face.vertices],
+      })),
+      nextIds: {
+        vertex: this.#nextVertex,
+        halfEdge: this.#nextHalfEdge,
+        edge: this.#nextEdge,
+        face: this.#nextFace,
+      },
+      revision: this.#revision,
+    };
+  }
+  static fromArchive(archive: EditableMeshArchive): EditableMesh {
+    const mesh = new EditableMesh();
+    for (const vertex of archive.vertices)
+      mesh.vertices.set(vertex.id, {
+        ...vertex,
+        position: { ...vertex.position },
+      });
+    for (const halfEdge of archive.halfEdges)
+      mesh.halfEdges.set(halfEdge.id, { ...halfEdge });
+    for (const edge of archive.edges)
+      mesh.edges.set(edge.id, { ...edge, halfEdges: [...edge.halfEdges] });
+    for (const face of archive.faces)
+      mesh.faces.set(face.id, { ...face, vertices: [...face.vertices] });
+    mesh.#nextVertex = archive.nextIds.vertex;
+    mesh.#nextHalfEdge = archive.nextIds.halfEdge;
+    mesh.#nextEdge = archive.nextIds.edge;
+    mesh.#nextFace = archive.nextIds.face;
+    mesh.#revision = archive.revision;
+    return mesh;
   }
   replaceWith(source: EditableMesh): void {
     this.vertices.clear();

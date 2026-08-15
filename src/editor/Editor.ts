@@ -37,6 +37,7 @@ import {
   splitEdge,
   splitFace,
 } from "./mesh/topologyOperations";
+import { deserializeProject, serializeProject } from "./formats/projectFormat";
 type Listener = () => void;
 export class Editor {
   readonly document = new ModelDocument();
@@ -50,6 +51,7 @@ export class Editor {
   >();
   #nextObjectId = 1;
   #revision = 0;
+  #isDirty = false;
   #snapshot: EditorSnapshot = this.#createSnapshot();
   subscribe = (listener: Listener): (() => void) => {
     this.#listeners.add(listener);
@@ -76,7 +78,7 @@ export class Editor {
     this.#selectedObjectIds.add(id);
     this.selection.setMode("object");
     this.selection.replace({ objectId: id, elementId: id });
-    this.#commit();
+    this.#commit(true);
     return id;
   }
   deleteSelectedObjects(): void {
@@ -87,7 +89,7 @@ export class Editor {
     );
     this.#selectedObjectIds.clear();
     this.selection.clear();
-    this.#commit();
+    this.#commit(true);
   }
   selectObject(id?: ObjectId): void {
     if (id && !this.document.getObject(id)) return;
@@ -142,7 +144,7 @@ export class Editor {
     const object = this.document.getObject(id);
     if (!object || object.visible === visible) return;
     object.visible = visible;
-    this.#commit();
+    this.#commit(true);
   }
   transformObject(id: ObjectId, transform: TransformValue): void {
     const object = this.document.getObject(id);
@@ -151,7 +153,7 @@ export class Editor {
       new TransformObjectCommand(id, object.transform, transform),
       this.document,
     );
-    this.#commit();
+    this.#commit(true);
   }
   translateSelected(delta: Vector3Value): void {
     const commands: EditMeshCommand[] = [];
@@ -176,7 +178,7 @@ export class Editor {
         new CompositeCommand("要素を移動", commands),
         this.document,
       );
-      this.#commit();
+      this.#commit(true);
     }
   }
   scaleSelected(scale: Vector3Value): void {
@@ -242,7 +244,7 @@ export class Editor {
         before,
         after: this.selection.snapshot(),
       });
-      this.#commit();
+      this.#commit(true);
     }
   }
   extrudeSelectedFaces(distance: number): void {
@@ -319,7 +321,7 @@ export class Editor {
       before,
       after: this.selection.snapshot(),
     });
-    this.#commit();
+    this.#commit(true);
   }
   #selectionGroups(): Map<ObjectId, SelectionItem[]> {
     const groups = new Map<ObjectId, SelectionItem[]>();
@@ -349,7 +351,7 @@ export class Editor {
         new CompositeCommand(label, commands),
         this.document,
       );
-      this.#commit();
+      this.#commit(true);
     }
   }
   #selectionPivot(): Vector3Value {
@@ -402,7 +404,7 @@ export class Editor {
     const selection = command ? this.#selectionHistory.get(command) : undefined;
     if (selection) this.#restoreSelection(selection.before);
     this.#reconcileSelection();
-    this.#commit();
+    this.#commit(true);
   }
   redo(): void {
     if (!this.history.canRedo) return;
@@ -410,7 +412,7 @@ export class Editor {
     const selection = command ? this.#selectionHistory.get(command) : undefined;
     if (selection) this.#restoreSelection(selection.after);
     this.#reconcileSelection();
-    this.#commit();
+    this.#commit(true);
   }
   #reconcileSelection(): void {
     for (const id of this.#selectedObjectIds)
@@ -422,7 +424,35 @@ export class Editor {
     for (const item of snapshot.items)
       this.#selectedObjectIds.add(item.objectId);
   }
-  #commit(): void {
+  serializeProject(): string {
+    return serializeProject(this.document.objects());
+  }
+  loadProject(source: string): void {
+    const objects = deserializeProject(source);
+    this.document.clear();
+    for (const object of objects) this.document.addObject(object);
+    this.history.clear();
+    this.selection.setMode("object");
+    this.selection.clear();
+    this.#selectedObjectIds.clear();
+    this.#nextObjectId =
+      Math.max(
+        0,
+        ...objects.map((object) => {
+          const match = /^object-(\d+)$/.exec(object.id);
+          return match ? Number(match[1]) : 0;
+        }),
+      ) + 1;
+    this.#isDirty = false;
+    this.#commit();
+  }
+  markSaved(): void {
+    if (!this.#isDirty) return;
+    this.#isDirty = false;
+    this.#commit();
+  }
+  #commit(documentChanged = false): void {
+    if (documentChanged) this.#isDirty = true;
     this.#revision += 1;
     this.#snapshot = this.#createSnapshot();
     for (const listener of this.#listeners) listener();
@@ -436,6 +466,7 @@ export class Editor {
       canRedo: this.history.canRedo,
       selectionMode: this.selection.mode,
       selectionItems: this.selection.items,
+      isDirty: this.#isDirty,
     };
   }
 }

@@ -28,4 +28,8 @@ export class CommandHistory {
     this.#undoStack.push(command);
     return command;
   }
+  clear(): void {
+    this.#undoStack.length = 0;
+    this.#redoStack.length = 0;
+  }
 }

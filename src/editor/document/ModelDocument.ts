@@ -15,6 +15,12 @@ export class ModelDocument {
   getObject(id: ObjectId): ModelObject | undefined {
     return this.#objects.get(id);
   }
+  clear(): void {
+    this.#objects.clear();
+  }
+  objects(): readonly ModelObject[] {
+    return [...this.#objects.values()];
+  }
   toSnapshot(): readonly ModelObjectSnapshot[] {
     return [...this.#objects.values()].map((object) => object.toSnapshot());
   }
