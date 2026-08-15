@@ -1,5 +1,6 @@
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import {
+  AlertCircle,
   Box,
   BoxIcon,
   ChevronDown,
@@ -7,6 +8,7 @@ import {
   Expand,
   Eye,
   EyeOff,
+  HelpCircle,
   MousePointer2,
   Move3D,
   Plus,
@@ -35,7 +37,6 @@ const labels: Record<Capability, string> = {
 export default function App() {
   const editor = useEditor();
   const snapshot = useEditorSnapshot();
-  useEditorShortcuts(editor);
   const selectedObject = snapshot.objects.find((object) =>
     snapshot.selectedObjectIds.has(object.id),
   );
@@ -45,6 +46,23 @@ export default function App() {
   );
   const [transformMode, setTransformMode] =
     useState<TransformMode>("translate");
+  const [showShortcuts, setShowShortcuts] = useState(false);
+  const [errorMessage, setErrorMessage] = useState<string>();
+  const [contextMenu, setContextMenu] = useState<{ x: number; y: number }>();
+  const contextMenuRef = useRef<HTMLDivElement>(null);
+  const openShortcutHelp = useCallback(() => setShowShortcuts(true), []);
+  useEditorShortcuts(editor, {
+    setTransformMode,
+    showHelp: openShortcutHelp,
+  });
+  useEffect(() => {
+    if (contextMenu) contextMenuRef.current?.focus();
+  }, [contextMenu]);
+  useEffect(() => {
+    if (!errorMessage) return;
+    const timer = window.setTimeout(() => setErrorMessage(undefined), 5000);
+    return () => window.clearTimeout(timer);
+  }, [errorMessage]);
   const handleViewportStatus = useCallback((status: ViewportStatus) => {
     setCapability(
       status.error ? "unsupported" : (status.backend ?? "checking"),
@@ -67,6 +85,11 @@ export default function App() {
         <div className="brand" aria-label="Polygon Modeler">
           <Box className="brand-mark" aria-hidden="true" />
           Polygon Modeler
+          {snapshot.revision > 0 && (
+            <span className="dirty-indicator" aria-label="未保存の変更あり">
+              ●
+            </span>
+          )}
         </div>
         <nav className="menu-bar" aria-label="メインメニュー">
           {["ファイル", "編集", "表示"].map((menu) => (
@@ -77,6 +100,10 @@ export default function App() {
           ))}
         </nav>
         <div className="history-actions" aria-label="履歴操作">
+          <button type="button" onClick={openShortcutHelp}>
+            <HelpCircle aria-hidden="true" />
+            ショートカット
+          </button>
           <button
             type="button"
             disabled={!snapshot.canUndo}
@@ -151,7 +178,14 @@ export default function App() {
           </button>
         </aside>
 
-        <section className="viewport-panel" aria-label="3D ビューポート">
+        <section
+          className="viewport-panel"
+          aria-label="3D ビューポート"
+          onContextMenu={(event) => {
+            event.preventDefault();
+            setContextMenu({ x: event.clientX, y: event.clientY });
+          }}
+        >
           <div className="selection-mode-bar" aria-label="選択モード">
             {(
               [
@@ -199,6 +233,66 @@ export default function App() {
             selectionMode={snapshot.selectionMode}
             onPick={handlePick}
           />
+          {contextMenu && (
+            <div
+              ref={contextMenuRef}
+              className="context-menu"
+              role="menu"
+              tabIndex={-1}
+              style={{ left: contextMenu.x, top: contextMenu.y }}
+              onBlur={(event) => {
+                if (!event.currentTarget.contains(event.relatedTarget))
+                  setContextMenu(undefined);
+              }}
+              onKeyDown={(event) => {
+                if (event.key === "Escape") setContextMenu(undefined);
+              }}
+            >
+              <button
+                type="button"
+                role="menuitem"
+                onClick={() => {
+                  editor.selectAll();
+                  setContextMenu(undefined);
+                }}
+              >
+                すべて選択
+                <kbd>⌘/Ctrl A</kbd>
+              </button>
+              <button
+                type="button"
+                role="menuitem"
+                onClick={() => {
+                  editor.clearSelection();
+                  setContextMenu(undefined);
+                }}
+              >
+                選択解除
+                <kbd>Alt A</kbd>
+              </button>
+              <button
+                type="button"
+                role="menuitem"
+                disabled={
+                  snapshot.selectionItems.length === 0 &&
+                  snapshot.selectedObjectIds.size === 0
+                }
+                onClick={() => {
+                  try {
+                    editor.deleteSelectedElements();
+                  } catch (error) {
+                    setErrorMessage(
+                      error instanceof Error ? error.message : String(error),
+                    );
+                  }
+                  setContextMenu(undefined);
+                }}
+              >
+                削除
+                <kbd>Delete</kbd>
+              </button>
+            </div>
+          )}
         </section>
 
         <aside className="side-panel">
@@ -251,7 +345,10 @@ export default function App() {
             <h2 id="inspector-title">インスペクター</h2>
             {snapshot.selectionMode !== "object" &&
             snapshot.selectionItems.length ? (
-              <ElementTransformPanel editor={editor} />
+              <ElementTransformPanel
+                editor={editor}
+                onError={setErrorMessage}
+              />
             ) : selectedObject ? (
               <TransformInspector editor={editor} object={selectedObject} />
             ) : (
@@ -262,6 +359,7 @@ export default function App() {
       </div>
 
       <footer className="status-bar">
+        <span>ツール: {transformMode}</span>
         <span>モード: {snapshot.selectionMode}</span>
         <span>選択: {snapshot.selectionItems.length}</span>
         <span>
@@ -286,6 +384,49 @@ export default function App() {
           {labels[capability]}
         </span>
       </footer>
+      {showShortcuts && (
+        <div className="dialog-backdrop" role="presentation">
+          <section
+            className="shortcut-dialog"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="shortcut-title"
+          >
+            <header>
+              <h2 id="shortcut-title">キーボードショートカット</h2>
+              <button type="button" onClick={() => setShowShortcuts(false)}>
+                閉じる
+              </button>
+            </header>
+            <dl>
+              {[
+                ["1 / 2 / 3 / 4", "Object / Vertex / Edge / Face"],
+                ["G / R / S", "移動 / 回転 / 拡大縮小"],
+                ["⌘/Ctrl A", "すべて選択"],
+                ["Alt A", "選択解除"],
+                ["Delete", "削除"],
+                ["⌘/Ctrl Z", "元に戻す"],
+                ["⌘/Ctrl Shift Z", "やり直す"],
+                ["?", "この一覧を表示"],
+              ].map(([key, description]) => (
+                <div key={key}>
+                  <dt>{key}</dt>
+                  <dd>{description}</dd>
+                </div>
+              ))}
+            </dl>
+          </section>
+        </div>
+      )}
+      {errorMessage && (
+        <div className="error-toast" role="alert">
+          <AlertCircle aria-hidden="true" />
+          {errorMessage}
+          <button type="button" onClick={() => setErrorMessage(undefined)}>
+            閉じる
+          </button>
+        </div>
+      )}
     </main>
   );
 }

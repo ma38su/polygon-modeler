@@ -87,3 +87,31 @@ test("previews, cancels, commits, and replays a face extrusion", async ({
   await page.getByRole("button", { name: "やり直す" }).click();
   await expect(page.getByText("面: 5")).toBeVisible();
 });
+
+test("coordinates viewport focus, shortcuts, context menu, and dirty state", async ({
+  page,
+}) => {
+  await page.goto("/?renderer=webgl2");
+  await page.getByRole("button", { name: "Box追加" }).click();
+  await expect(page.getByLabel("未保存の変更あり")).toBeVisible();
+
+  const viewport = page.getByTestId("viewport-canvas");
+  await viewport.click({ position: { x: 350, y: 250 } });
+  await page.keyboard.press("4");
+  await expect(page.getByRole("button", { name: "Face" })).toHaveClass(
+    /active/,
+  );
+  await page.keyboard.press("r");
+  await expect(page.getByText("ツール: rotate")).toBeVisible();
+
+  await viewport.click({ button: "right", position: { x: 350, y: 250 } });
+  await expect(page.getByRole("menu")).toBeVisible();
+  await page.getByRole("menuitem", { name: /すべて選択/ }).click();
+  await expect(page.getByText("選択: 6")).toBeVisible();
+
+  await viewport.focus();
+  await page.keyboard.press("?");
+  await expect(
+    page.getByRole("dialog", { name: "キーボードショートカット" }),
+  ).toBeVisible();
+});

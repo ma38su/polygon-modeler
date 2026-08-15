@@ -9,12 +9,25 @@ import {
   SquareDashed,
 } from "lucide-react";
 type Values = { x: number; y: number; z: number };
-export function ElementTransformPanel({ editor }: { editor: Editor }) {
+export function ElementTransformPanel({
+  editor,
+  onError,
+}: {
+  editor: Editor;
+  onError(message: string): void;
+}) {
   const [move, setMove] = useState<Values>({ x: 0, y: 0, z: 0 });
   const [rotate, setRotate] = useState<Values>({ x: 0, y: 0, z: 0 });
   const [scale, setScale] = useState<Values>({ x: 1, y: 1, z: 1 });
   const [extrudeDistance, setExtrudeDistance] = useState(1);
   const resetModelingPreview = () => setExtrudeDistance(1);
+  const run = (action: () => void) => {
+    try {
+      action();
+    } catch (error) {
+      onError(error instanceof Error ? error.message : String(error));
+    }
+  };
   const fields = (values: Values, setValues: (value: Values) => void) => (
     <div className="vector-fields">
       {(["x", "y", "z"] as const).map((axis) => (
@@ -85,26 +98,38 @@ export function ElementTransformPanel({ editor }: { editor: Editor }) {
         <button
           type="button"
           onClick={() => {
-            editor.extrudeSelectedFaces(extrudeDistance);
+            run(() => editor.extrudeSelectedFaces(extrudeDistance));
             resetModelingPreview();
           }}
         >
           <Layers3 aria-hidden="true" />
           押し出し
         </button>
-        <button type="button" onClick={() => editor.splitSelectedElements()}>
+        <button
+          type="button"
+          onClick={() => run(() => editor.splitSelectedElements())}
+        >
           <Scissors aria-hidden="true" />
           分割
         </button>
-        <button type="button" onClick={() => editor.createFaceFromSelection()}>
+        <button
+          type="button"
+          onClick={() => run(() => editor.createFaceFromSelection())}
+        >
           <SquareDashed aria-hidden="true" />
           面生成
         </button>
-        <button type="button" onClick={() => editor.mergeSelectedVertices()}>
+        <button
+          type="button"
+          onClick={() => run(() => editor.mergeSelectedVertices())}
+        >
           <Combine aria-hidden="true" />
           頂点結合
         </button>
-        <button type="button" onClick={() => editor.flipSelectedFaces()}>
+        <button
+          type="button"
+          onClick={() => run(() => editor.flipSelectedFaces())}
+        >
           <FlipVertical2 aria-hidden="true" />
           面反転
         </button>

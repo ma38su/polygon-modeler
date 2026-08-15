@@ -72,6 +72,8 @@ export function ViewportCanvas({
       className="viewport-canvas"
       ref={hostRef}
       data-testid="viewport-canvas"
+      tabIndex={0}
+      onPointerDown={(event) => event.currentTarget.focus()}
     >
       {error && (
         <div className="viewport-error" role="alert">

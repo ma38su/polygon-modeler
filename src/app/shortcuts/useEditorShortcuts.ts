@@ -1,10 +1,21 @@
 import { useEffect } from "react";
 import type { Editor } from "../../editor/Editor";
-export function useEditorShortcuts(editor: Editor): void {
+import type { TransformMode } from "../../viewport/Viewport";
+
+interface ShortcutOptions {
+  setTransformMode(mode: TransformMode): void;
+  showHelp(): void;
+}
+
+export function useEditorShortcuts(
+  editor: Editor,
+  { setTransformMode, showHelp }: ShortcutOptions,
+): void {
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
       const target = event.target as HTMLElement | null;
-      if (target?.matches("input, textarea, [contenteditable=true]")) return;
+      if (target?.matches("input, textarea, select, [contenteditable=true]"))
+        return;
       const modifier = event.metaKey || event.ctrlKey;
       if (modifier && event.key.toLowerCase() === "z") {
         event.preventDefault();
@@ -24,6 +35,14 @@ export function useEditorShortcuts(editor: Editor): void {
           "4": "face",
         } as const;
         editor.setSelectionMode(modes[event.key as keyof typeof modes]);
+      } else if (event.key.toLowerCase() === "g") {
+        setTransformMode("translate");
+      } else if (event.key.toLowerCase() === "r") {
+        setTransformMode("rotate");
+      } else if (event.key.toLowerCase() === "s") {
+        setTransformMode("scale");
+      } else if (event.key === "?") {
+        showHelp();
       } else if (event.key === "Delete" || event.key === "Backspace") {
         event.preventDefault();
         editor.deleteSelectedElements();
@@ -31,5 +50,5 @@ export function useEditorShortcuts(editor: Editor): void {
     };
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
-  }, [editor]);
+  }, [editor, setTransformMode, showHelp]);
 }

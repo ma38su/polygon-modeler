@@ -33,6 +33,10 @@ button {
   color: var(--accent-bright);
   stroke-width: 1.8;
 }
+.dirty-indicator {
+  color: var(--accent-bright);
+  font-size: 9px;
+}
 .menu-bar,
 .history-actions {
   display: flex;
@@ -130,6 +134,40 @@ h2 {
   width: 100%;
   height: 100%;
   position: relative;
+}
+.viewport-canvas:focus-visible {
+  outline: 2px solid var(--accent-bright);
+  outline-offset: -2px;
+}
+.context-menu {
+  position: fixed;
+  z-index: 20;
+  min-width: 190px;
+  padding: 5px;
+  border: 1px solid var(--border);
+  border-radius: 7px;
+  background: var(--surface-1);
+  box-shadow: 0 12px 32px rgb(0 0 0 / 35%);
+}
+.context-menu button {
+  width: 100%;
+  display: flex;
+  justify-content: space-between;
+  gap: 20px;
+  padding: 7px 9px;
+  border: 0;
+  border-radius: 4px;
+  color: var(--text-secondary);
+  background: transparent;
+  text-align: left;
+}
+.context-menu button:hover:not(:disabled) {
+  color: var(--text-primary);
+  background: var(--surface-3);
+}
+kbd {
+  color: var(--text-muted);
+  font: 10px var(--mono, monospace);
 }
 .viewport-canvas canvas {
   display: block;
@@ -409,4 +447,71 @@ h2 {
 }
 .renderer-status-unsupported svg {
   color: #e65f5f;
+}
+.dialog-backdrop {
+  position: fixed;
+  z-index: 30;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  background: rgb(0 0 0 / 55%);
+}
+.shortcut-dialog {
+  width: min(440px, calc(100vw - 32px));
+  padding: 16px;
+  border: 1px solid var(--border);
+  border-radius: 9px;
+  background: var(--surface-1);
+  box-shadow: 0 20px 60px rgb(0 0 0 / 45%);
+}
+.shortcut-dialog header,
+.shortcut-dialog dl > div {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.shortcut-dialog header h2 {
+  margin: 0;
+}
+.shortcut-dialog header button,
+.error-toast button {
+  border: 0;
+  color: var(--text-secondary);
+  background: transparent;
+}
+.shortcut-dialog dl {
+  margin: 14px 0 0;
+}
+.shortcut-dialog dl > div {
+  padding: 8px 0;
+  border-top: 1px solid var(--border);
+}
+.shortcut-dialog dt {
+  font: 11px var(--mono, monospace);
+}
+.shortcut-dialog dd {
+  margin: 0;
+  color: var(--text-secondary);
+  font-size: 12px;
+}
+.error-toast {
+  position: fixed;
+  z-index: 40;
+  right: 16px;
+  bottom: 42px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  max-width: 440px;
+  padding: 10px 12px;
+  border: 1px solid #8e4444;
+  border-radius: 7px;
+  color: #ffd3d3;
+  background: #4b2424;
+  box-shadow: 0 10px 30px rgb(0 0 0 / 30%);
+  font-size: 12px;
+}
+.error-toast svg {
+  width: 16px;
+  height: 16px;
 }
