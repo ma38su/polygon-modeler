@@ -9,9 +9,11 @@ import type {
   ModelObjectSnapshot,
   ObjectId,
 } from "../../editor/document/types";
+import { triangulate } from "../../editor/mesh/triangulate";
 export class RenderGeometryAdapter {
   readonly group = new Group();
   readonly #meshes = new Map<ObjectId, Mesh>();
+  readonly #meshRevisions = new Map<ObjectId, number>();
   sync(
     objects: readonly ModelObjectSnapshot[],
     selectedIds: ReadonlySet<ObjectId>,
@@ -25,6 +27,11 @@ export class RenderGeometryAdapter {
         mesh = this.#createMesh(object);
         this.#meshes.set(object.id, mesh);
         this.group.add(mesh);
+        this.#meshRevisions.set(object.id, object.mesh.revision);
+      } else if (this.#meshRevisions.get(object.id) !== object.mesh.revision) {
+        mesh.geometry.dispose();
+        mesh.geometry = this.#createGeometry(object);
+        this.#meshRevisions.set(object.id, object.mesh.revision);
       }
       mesh.name = object.name;
       mesh.visible = object.visible;
@@ -56,22 +63,8 @@ export class RenderGeometryAdapter {
     return this.#meshes.get(id);
   }
   #createMesh(object: ModelObjectSnapshot): Mesh {
-    const geometry = new BufferGeometry();
-    geometry.setAttribute(
-      "position",
-      new Float32BufferAttribute(object.mesh.positions, 3),
-    );
-    const indices: number[] = [];
-    for (const face of object.mesh.faces)
-      for (let index = 1; index < face.length - 1; index += 1) {
-        const [a, b, c] = [face[0], face[index], face[index + 1]];
-        if (a !== undefined && b !== undefined && c !== undefined)
-          indices.push(a, b, c);
-      }
-    geometry.setIndex(indices);
-    geometry.computeVertexNormals();
     return new Mesh(
-      geometry,
+      this.#createGeometry(object),
       new MeshStandardMaterial({
         color: 0x9aa5b5,
         roughness: 0.72,
@@ -79,10 +72,22 @@ export class RenderGeometryAdapter {
       }),
     );
   }
+
+  #createGeometry(object: ModelObjectSnapshot): BufferGeometry {
+    const geometry = new BufferGeometry();
+    geometry.setAttribute(
+      "position",
+      new Float32BufferAttribute(object.mesh.positions, 3),
+    );
+    geometry.setIndex(triangulate(object.mesh));
+    geometry.computeVertexNormals();
+    return geometry;
+  }
   #remove(id: ObjectId, mesh: Mesh): void {
     this.group.remove(mesh);
     mesh.geometry.dispose();
     (mesh.material as MeshStandardMaterial).dispose();
     this.#meshes.delete(id);
+    this.#meshRevisions.delete(id);
   }
 }

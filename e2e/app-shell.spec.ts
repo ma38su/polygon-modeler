@@ -32,6 +32,16 @@ test("shows the empty editor shell", async ({ page }) => {
   await expect(page.getByRole("button", { name: "Box 1を表示" })).toBeVisible();
   await page.getByRole("button", { name: "削除" }).click();
   await expect(page.getByText("シーンは空です")).toBeVisible();
+  await page.getByRole("button", { name: "Plane追加" }).click();
+  await page.getByRole("button", { name: "Cylinder追加" }).click();
+  await expect(
+    page.getByRole("button", { name: "Plane 2", exact: true }),
+  ).toBeVisible();
+  await expect(
+    page.getByRole("button", { name: "Cylinder 3", exact: true }),
+  ).toBeVisible();
+  await expect(page.getByText("頂点: 36")).toBeVisible();
+  await expect(page.getByText("面: 19")).toBeVisible();
   await page.getByRole("button", { name: "正投影" }).click();
   await expect(page.getByRole("button", { name: "正投影" })).toHaveClass(
     /active/,

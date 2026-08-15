@@ -1,9 +1,5 @@
-import type {
-  MeshData,
-  ModelObjectSnapshot,
-  ObjectId,
-  TransformValue,
-} from "./types";
+import type { ModelObjectSnapshot, ObjectId, TransformValue } from "./types";
+import type { EditableMesh } from "../mesh/EditableMesh";
 const identityTransform = (): TransformValue => ({
   position: { x: 0, y: 0, z: 0 },
   rotation: { x: 0, y: 0, z: 0 },
@@ -11,11 +7,11 @@ const identityTransform = (): TransformValue => ({
 });
 export class ModelObject {
   readonly id: ObjectId;
-  readonly mesh: MeshData;
+  readonly mesh: EditableMesh;
   name: string;
   visible = true;
   transform: TransformValue = identityTransform();
-  constructor(id: ObjectId, name: string, mesh: MeshData) {
+  constructor(id: ObjectId, name: string, mesh: EditableMesh) {
     this.id = id;
     this.mesh = mesh;
     this.name = name;
@@ -26,7 +22,7 @@ export class ModelObject {
       name: this.name,
       visible: this.visible,
       transform: this.transform,
-      mesh: this.mesh,
+      mesh: this.mesh.toMeshData(),
     };
   }
 }

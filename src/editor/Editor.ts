@@ -2,6 +2,10 @@ import { ModelDocument } from "./document/ModelDocument";
 import { ModelObject } from "./document/ModelObject";
 import type { EditorSnapshot, ObjectId } from "./document/types";
 import { createBoxMesh } from "./mesh/primitives/box";
+import { createPlaneMesh } from "./mesh/primitives/plane";
+import { createCylinderMesh } from "./mesh/primitives/cylinder";
+import type { EditableMesh } from "./mesh/EditableMesh";
+import { validateMesh } from "./mesh/validateMesh";
 import { CommandHistory } from "./history/CommandHistory";
 import {
   CreateObjectCommand,
@@ -24,9 +28,20 @@ export class Editor {
   };
   getSnapshot = (): EditorSnapshot => this.#snapshot;
   createBox(): ObjectId {
+    return this.#createObject("Box", createBoxMesh());
+  }
+  createPlane(): ObjectId {
+    return this.#createObject("Plane", createPlaneMesh());
+  }
+  createCylinder(): ObjectId {
+    return this.#createObject("Cylinder", createCylinderMesh());
+  }
+  #createObject(kind: string, mesh: EditableMesh): ObjectId {
+    const validation = validateMesh(mesh);
+    if (!validation.valid) throw new Error(validation.errors.join("\n"));
     const sequence = this.#nextObjectId++;
     const id = `object-${sequence}` as ObjectId;
-    const object = new ModelObject(id, `Box ${sequence}`, createBoxMesh());
+    const object = new ModelObject(id, `${kind} ${sequence}`, mesh);
     this.history.execute(new CreateObjectCommand(object), this.document);
     this.#selectedObjectIds.clear();
     this.#selectedObjectIds.add(id);

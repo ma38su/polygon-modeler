@@ -121,6 +121,22 @@ export default function App() {
           <button
             type="button"
             className="tool-button"
+            onClick={() => editor.createPlane()}
+          >
+            <Plus aria-hidden="true" />
+            Plane追加
+          </button>
+          <button
+            type="button"
+            className="tool-button"
+            onClick={() => editor.createCylinder()}
+          >
+            <Plus aria-hidden="true" />
+            Cylinder追加
+          </button>
+          <button
+            type="button"
+            className="tool-button"
             disabled={snapshot.selectedObjectIds.size === 0}
             onClick={() => editor.deleteSelectedObjects()}
           >
