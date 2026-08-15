@@ -1,6 +1,6 @@
 # Polygon Modeler
 
-ブラウザ内で完結するローカルファーストのポリゴンモデラーです。現在は実装計画のPhase 0（リポジトリと品質基盤）までを実装しています。
+ブラウザ内で完結するローカルファーストのポリゴンモデラーです。現在は実装計画のPhase 1（Viewport基盤）までを実装しています。
 
 ## 開発
 
@@ -28,4 +28,4 @@ npm run test:e2e
 - `src/ui`: React UI
 - `src/app`: アプリ統合、Provider、ショートカット
 
-Three.jsレンダラーと実際の3D表示はPhase 1で実装します。
+描画バックエンドを固定して確認する場合は、URLへ`?renderer=webgl2`または`?renderer=webgpu`を追加します。

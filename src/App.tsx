@@ -1,6 +1,7 @@
-import { useEffect, useState } from "react";
+import { useCallback, useState } from "react";
 import {
   Box,
+  BoxIcon,
   ChevronDown,
   CircleGauge,
   Expand,
@@ -10,10 +11,11 @@ import {
   Rotate3D,
   Undo2,
 } from "lucide-react";
+import { ViewportCanvas } from "./viewport/ViewportCanvas";
+import type { ViewportStatus } from "./viewport/Viewport";
 import "./App.css";
 
 type Capability = "checking" | "webgpu" | "webgl2" | "unsupported";
-
 const labels: Record<Capability, string> = {
   checking: "描画環境を確認中",
   webgpu: "WebGPU 対応",
@@ -21,17 +23,16 @@ const labels: Record<Capability, string> = {
   unsupported: "3D 描画非対応",
 };
 
-function detectCapability(): Capability {
-  if ("gpu" in navigator) return "webgpu";
-  return document.createElement("canvas").getContext("webgl2")
-    ? "webgl2"
-    : "unsupported";
-}
-
 export default function App() {
   const [capability, setCapability] = useState<Capability>("checking");
-
-  useEffect(() => setCapability(detectCapability()), []);
+  const [projection, setProjection] = useState<"perspective" | "orthographic">(
+    "perspective",
+  );
+  const handleViewportStatus = useCallback((status: ViewportStatus) => {
+    setCapability(
+      status.error ? "unsupported" : (status.backend ?? "checking"),
+    );
+  }, []);
 
   return (
     <main className="editor-shell">
@@ -82,17 +83,28 @@ export default function App() {
         </aside>
 
         <section className="viewport-panel" aria-label="3D ビューポート">
-          <div className="viewport-placeholder">
-            <div className="axis-glyph" aria-hidden="true">
-              <span className="axis-x">X</span>
-              <span className="axis-y">Y</span>
-              <span className="axis-z">Z</span>
-            </div>
-            <div className="viewport-message">
-              <strong>3D Viewport</strong>
-              <span>レンダラーは Phase 1 で接続されます</span>
-            </div>
+          <div className="viewport-toolbar" aria-label="ビューポート設定">
+            <button
+              type="button"
+              className={projection === "perspective" ? "active" : ""}
+              onClick={() => setProjection("perspective")}
+            >
+              <BoxIcon aria-hidden="true" />
+              透視
+            </button>
+            <button
+              type="button"
+              className={projection === "orthographic" ? "active" : ""}
+              onClick={() => setProjection("orthographic")}
+            >
+              <Box aria-hidden="true" />
+              正投影
+            </button>
           </div>
+          <ViewportCanvas
+            projection={projection}
+            onStatusChange={handleViewportStatus}
+          />
         </section>
 
         <aside className="side-panel">

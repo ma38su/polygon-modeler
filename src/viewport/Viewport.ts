@@ -1,0 +1,211 @@
+import {
+  AxesHelper,
+  Color,
+  GridHelper,
+  HemisphereLight,
+  OrthographicCamera,
+  PerspectiveCamera,
+  Scene,
+  WebGLRenderer,
+  type Camera,
+} from "three";
+import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
+import type { WebGPURenderer as WebGpuRenderer } from "three/webgpu";
+import {
+  canUseWebGpu,
+  getRendererPreference,
+  type RendererBackend,
+} from "./renderer/capabilities";
+
+type Projection = "perspective" | "orthographic";
+
+export interface ViewportStatus {
+  backend?: RendererBackend;
+  error?: string;
+  projection: Projection;
+}
+
+type StatusListener = (status: ViewportStatus) => void;
+type Renderer = WebGLRenderer | WebGpuRenderer;
+
+export class Viewport {
+  readonly element: HTMLElement;
+  readonly #scene = new Scene();
+  readonly #perspectiveCamera = new PerspectiveCamera(45, 1, 0.01, 10_000);
+  readonly #orthographicCamera = new OrthographicCamera(
+    -5,
+    5,
+    5,
+    -5,
+    0.01,
+    10_000,
+  );
+  readonly #statusListener: StatusListener;
+  readonly #resizeObserver: ResizeObserver;
+  #projection: Projection = "perspective";
+  #renderer?: Renderer;
+  #controls?: OrbitControls;
+  #animationFrame?: number;
+  #disposed = false;
+
+  constructor(element: HTMLElement, statusListener: StatusListener) {
+    this.element = element;
+    this.#statusListener = statusListener;
+    this.#scene.background = new Color(0x20252e);
+    this.#scene.add(new GridHelper(20, 20, 0x586476, 0x343b47));
+    this.#scene.add(new AxesHelper(2));
+    this.#scene.add(new HemisphereLight(0xffffff, 0x28303d, 1.5));
+    this.#perspectiveCamera.position.set(6, 5, 8);
+    this.#orthographicCamera.position.copy(this.#perspectiveCamera.position);
+
+    this.#resizeObserver = new ResizeObserver(() => this.#resize());
+    this.#resizeObserver.observe(element);
+  }
+
+  async initialize(): Promise<void> {
+    const preference = getRendererPreference(window.location.search);
+    try {
+      if (preference !== "webgl2" && canUseWebGpu(navigator)) {
+        await this.#initializeWebGpu();
+      } else if (preference === "webgpu") {
+        throw new Error("このブラウザではWebGPUを利用できません。");
+      } else {
+        this.#initializeWebGl2();
+      }
+    } catch (error) {
+      if (preference === "webgpu") {
+        this.#emitError(error);
+        return;
+      }
+      this.#renderer?.dispose();
+      try {
+        this.#initializeWebGl2();
+      } catch (fallbackError) {
+        this.#emitError(fallbackError);
+        return;
+      }
+    }
+
+    if (this.#disposed) return;
+    this.#initializeControls();
+    this.#resize();
+    this.#render();
+  }
+
+  setProjection(projection: Projection): void {
+    if (projection === this.#projection) return;
+    const previous = this.#camera;
+    this.#projection = projection;
+    this.#camera.position.copy(previous.position);
+    this.#camera.quaternion.copy(previous.quaternion);
+    this.#controls?.dispose();
+    this.#initializeControls();
+    this.#resize();
+    this.#emitStatus();
+  }
+
+  dispose(): void {
+    this.#disposed = true;
+    this.#resizeObserver.disconnect();
+    this.#controls?.dispose();
+    if (this.#animationFrame !== undefined) {
+      cancelAnimationFrame(this.#animationFrame);
+    }
+    this.#renderer?.setAnimationLoop(null);
+    this.#renderer?.dispose();
+    this.element.replaceChildren();
+  }
+
+  get #camera(): Camera {
+    return this.#projection === "perspective"
+      ? this.#perspectiveCamera
+      : this.#orthographicCamera;
+  }
+
+  async #initializeWebGpu(): Promise<void> {
+    const { WebGPURenderer } = await import("three/webgpu");
+    const renderer = new WebGPURenderer({ antialias: true });
+    renderer.onDeviceLost = () => {
+      this.#statusListener({
+        projection: this.#projection,
+        error: "GPUデバイスが失われました。再読み込みしてください。",
+      });
+    };
+    await renderer.init();
+    this.#renderer = renderer;
+    this.element.replaceChildren(renderer.domElement);
+    this.#emitStatus("webgpu");
+  }
+
+  #initializeWebGl2(): void {
+    const canvas = document.createElement("canvas");
+    const context = canvas.getContext("webgl2", { antialias: true });
+    if (!context) throw new Error("WebGL 2を初期化できませんでした。");
+    const renderer = new WebGLRenderer({ canvas, context, antialias: true });
+    this.#renderer = renderer;
+    this.element.replaceChildren(canvas);
+    canvas.addEventListener("webglcontextlost", this.#handleContextLost);
+    this.#emitStatus("webgl2");
+  }
+
+  #initializeControls(): void {
+    if (!this.#renderer) return;
+    this.#controls = new OrbitControls(this.#camera, this.#renderer.domElement);
+    this.#controls.target.set(0, 0, 0);
+    this.#controls.enableDamping = true;
+    this.#controls.screenSpacePanning = true;
+    this.#controls.update();
+  }
+
+  #resize(): void {
+    if (!this.#renderer) return;
+    const width = Math.max(1, this.element.clientWidth);
+    const height = Math.max(1, this.element.clientHeight);
+    const aspect = width / height;
+    this.#perspectiveCamera.aspect = aspect;
+    this.#perspectiveCamera.updateProjectionMatrix();
+    const size = 5;
+    this.#orthographicCamera.left = -size * aspect;
+    this.#orthographicCamera.right = size * aspect;
+    this.#orthographicCamera.top = size;
+    this.#orthographicCamera.bottom = -size;
+    this.#orthographicCamera.updateProjectionMatrix();
+    this.#renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    this.#renderer.setSize(width, height, false);
+  }
+
+  #render = (): void => {
+    if (this.#disposed || !this.#renderer) return;
+    this.#controls?.update();
+    this.#renderer.render(this.#scene, this.#camera);
+    this.#animationFrame = requestAnimationFrame(this.#render);
+  };
+
+  #handleContextLost = (event: Event): void => {
+    event.preventDefault();
+    this.#statusListener({
+      projection: this.#projection,
+      error: "GPUコンテキストが失われました。再読み込みしてください。",
+    });
+  };
+
+  #emitStatus(backend?: RendererBackend): void {
+    this.#statusListener({
+      backend: backend ?? this.#rendererBackend,
+      projection: this.#projection,
+    });
+  }
+
+  #emitError(error: unknown): void {
+    this.#statusListener({
+      projection: this.#projection,
+      error:
+        error instanceof Error ? error.message : "描画の初期化に失敗しました。",
+    });
+  }
+
+  get #rendererBackend(): RendererBackend | undefined {
+    if (!this.#renderer) return undefined;
+    return this.#renderer instanceof WebGLRenderer ? "webgl2" : "webgpu";
+  }
+}
