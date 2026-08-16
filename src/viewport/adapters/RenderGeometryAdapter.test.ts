@@ -75,17 +75,18 @@ describe("RenderGeometryAdapter selection overlays", () => {
     const overlay = adapter.getOverlay(objectId)!;
     const vertices = overlay.getObjectByName(
       "vertex-overlay",
-    ) as import("three").Points;
+    ) as import("three").InstancedMesh;
     const selection = overlay.getObjectByName(
       "vertex-selection-overlay",
-    ) as import("three").Points;
-    const vertexSize = (vertices.material as import("three").PointsMaterial)
-      .size;
-    const selectionSize = (
-      selection.material as import("three").PointsMaterial
-    ).size;
-    expect(vertexSize).toBeGreaterThanOrEqual(10);
-    expect(selectionSize).toBeGreaterThan(vertexSize);
+    ) as import("three").InstancedMesh;
+    vertices.geometry.computeBoundingSphere();
+    selection.geometry.computeBoundingSphere();
+    expect(vertices.count).toBe(object.mesh.vertexIds.length);
+    expect(selection.count).toBe(1);
+    expect(vertices.geometry.boundingSphere!.radius).toBeGreaterThan(0.05);
+    expect(selection.geometry.boundingSphere!.radius).toBeGreaterThan(
+      vertices.geometry.boundingSphere!.radius,
+    );
     adapter.dispose();
   });
 

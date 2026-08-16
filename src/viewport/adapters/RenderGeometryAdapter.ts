@@ -3,13 +3,14 @@ import {
   Color,
   Float32BufferAttribute,
   Group,
+  InstancedMesh,
   LineBasicMaterial,
   LineSegments,
+  Matrix4,
   Mesh,
   MeshBasicMaterial,
   MeshStandardMaterial,
-  Points,
-  PointsMaterial,
+  SphereGeometry,
 } from "three";
 import type {
   ModelObjectSnapshot,
@@ -27,7 +28,10 @@ import {
 
 const OVERLAY_NAME = "selection-overlay";
 const baseColor = new Color(0x6f7d91);
+const vertexColor = new Color(0xd7e2f2);
 const selectedColor = new Color(0xffb84d);
+const VERTEX_RADIUS = 0.065;
+const SELECTED_VERTEX_RADIUS = 0.1;
 
 export class RenderGeometryAdapter {
   readonly group = new Group();
@@ -167,46 +171,56 @@ export class RenderGeometryAdapter {
     selected: ReadonlySet<SelectionItem["elementId"]>,
     highlightSelection: boolean,
   ): void {
-    const geometry = new BufferGeometry();
-    geometry.setAttribute(
-      "position",
-      new Float32BufferAttribute(object.mesh.positions, 3),
+    const vertices = this.#createVertexMarkers(
+      object,
+      object.mesh.vertexIds.map((_, index) => index),
+      VERTEX_RADIUS,
+      vertexColor,
     );
-    const points = new Points(
-      geometry,
-      new PointsMaterial({
-        color: baseColor,
-        size: 11,
-        sizeAttenuation: false,
-        depthTest: false,
-      }),
-    );
-    points.name = "vertex-overlay";
-    overlay.add(points);
+    vertices.name = "vertex-overlay";
+    overlay.add(vertices);
     if (!highlightSelection || selected.size === 0) return;
-    const selectedPositions = object.mesh.vertexIds.flatMap((id, index) =>
-      selected.has(id)
-        ? object.mesh.positions.slice(index * 3, index * 3 + 3)
-        : [],
+    const selectedIndices = object.mesh.vertexIds.flatMap((id, index) =>
+      selected.has(id) ? [index] : [],
     );
-    if (selectedPositions.length === 0) return;
-    const selectedGeometry = new BufferGeometry();
-    selectedGeometry.setAttribute(
-      "position",
-      new Float32BufferAttribute(selectedPositions, 3),
+    if (selectedIndices.length === 0) return;
+    const selectedVertices = this.#createVertexMarkers(
+      object,
+      selectedIndices,
+      SELECTED_VERTEX_RADIUS,
+      selectedColor,
     );
-    const selectedPoints = new Points(
-      selectedGeometry,
-      new PointsMaterial({
-        color: selectedColor,
-        size: 17,
-        sizeAttenuation: false,
+    selectedVertices.name = "vertex-selection-overlay";
+    selectedVertices.renderOrder = 5;
+    overlay.add(selectedVertices);
+  }
+  #createVertexMarkers(
+    object: ModelObjectSnapshot,
+    vertexIndices: readonly number[],
+    radius: number,
+    color: Color,
+  ): InstancedMesh {
+    const markers = new InstancedMesh(
+      new SphereGeometry(radius, 10, 8),
+      new MeshBasicMaterial({
+        color,
         depthTest: false,
+        depthWrite: false,
       }),
+      vertexIndices.length,
     );
-    selectedPoints.name = "vertex-selection-overlay";
-    selectedPoints.renderOrder = 5;
-    overlay.add(selectedPoints);
+    const matrix = new Matrix4();
+    vertexIndices.forEach((vertexIndex, instanceIndex) => {
+      matrix.makeTranslation(
+        object.mesh.positions[vertexIndex * 3]!,
+        object.mesh.positions[vertexIndex * 3 + 1]!,
+        object.mesh.positions[vertexIndex * 3 + 2]!,
+      );
+      markers.setMatrixAt(instanceIndex, matrix);
+    });
+    markers.instanceMatrix.needsUpdate = true;
+    markers.renderOrder = 4;
+    return markers;
   }
   #addEdgeOverlay(
     overlay: Group,
@@ -278,7 +292,6 @@ export class RenderGeometryAdapter {
     object.traverse((child) => {
       if (!(
         child instanceof Mesh ||
-        child instanceof Points ||
         child instanceof LineSegments
       ))
         return;
