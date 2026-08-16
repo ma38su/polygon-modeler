@@ -6,11 +6,19 @@ test("keeps header actions on one line at narrow window widths", async ({
   await page.setViewportSize({ width: 800, height: 700 });
   await page.goto("/?renderer=webgl2");
   const header = page.locator(".app-header");
-  await expect(header).toHaveCSS("height", "48px");
+  await expect(header).toHaveCSS("height", "44px");
+  await expect(header.getByRole("button", { name: "保存" })).toHaveCSS(
+    "font-size",
+    "12px",
+  );
   for (const button of await header.getByRole("button").all()) {
     await expect(button).toHaveCSS("white-space", "nowrap");
     expect((await button.boundingBox())?.height).toBeLessThanOrEqual(36);
   }
+  await expect(page.getByRole("button", { name: "移動" })).toHaveCSS(
+    "font-size",
+    "11px",
+  );
 });
 
 test("shows the empty editor shell", async ({ page }) => {
