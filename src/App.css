@@ -231,6 +231,18 @@ kbd {
   border-radius: 7px;
   background: color-mix(in srgb, var(--surface-1), transparent 8%);
 }
+.selection-mode-hint {
+  position: absolute;
+  z-index: 2;
+  top: 54px;
+  left: 150px;
+  padding: 4px 7px;
+  border-radius: 4px;
+  color: var(--text-muted);
+  background: color-mix(in srgb, var(--surface-1), transparent 18%);
+  font-size: 10px;
+  pointer-events: none;
+}
 .selection-mode-bar button {
   padding: 5px 7px;
   border: 0;

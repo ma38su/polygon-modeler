@@ -142,9 +142,17 @@ export class Viewport {
   syncObjects(
     objects: readonly ModelObjectSnapshot[],
     selectedIds: ReadonlySet<ObjectId>,
+    selectionMode: SelectionMode,
+    selectionItems: readonly SelectionItem[],
   ): void {
-    this.#geometryAdapter.sync(objects, selectedIds);
+    this.#geometryAdapter.sync(
+      objects,
+      selectedIds,
+      selectionMode,
+      selectionItems,
+    );
     this.#objects = objects;
+    this.#selectionMode = selectionMode;
     this.#selectedObjectId = selectedIds.values().next().value;
     this.#attachSelectedObject();
   }
@@ -283,9 +291,10 @@ export class Viewport {
 
   #attachSelectedObject(): void {
     if (!this.#transformControls) return;
-    const mesh = this.#selectedObjectId
-      ? this.#geometryAdapter.getMesh(this.#selectedObjectId)
-      : undefined;
+    const mesh =
+      this.#selectionMode === "object" && this.#selectedObjectId
+        ? this.#geometryAdapter.getMesh(this.#selectedObjectId)
+        : undefined;
     if (mesh) this.#transformControls.attach(mesh);
     else this.#transformControls.detach();
   }

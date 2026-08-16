@@ -20,6 +20,7 @@ export interface ViewportCanvasProps {
   transformMode: TransformMode;
   onTransformCommit: TransformCommitListener;
   selectionMode: SelectionMode;
+  selectionItems: readonly SelectionItem[];
   onPick(item: SelectionItem | undefined, additive: boolean): void;
 }
 
@@ -31,6 +32,7 @@ export function ViewportCanvas({
   transformMode,
   onTransformCommit,
   selectionMode,
+  selectionItems,
   onPick,
 }: ViewportCanvasProps) {
   const hostRef = useRef<HTMLDivElement>(null);
@@ -55,8 +57,14 @@ export function ViewportCanvas({
 
   useEffect(() => viewportRef.current?.setProjection(projection), [projection]);
   useEffect(
-    () => viewportRef.current?.syncObjects(objects, selectedObjectIds),
-    [objects, selectedObjectIds],
+    () =>
+      viewportRef.current?.syncObjects(
+        objects,
+        selectedObjectIds,
+        selectionMode,
+        selectionItems,
+      ),
+    [objects, selectedObjectIds, selectionItems, selectionMode],
   );
   useEffect(
     () => viewportRef.current?.setPicking(selectionMode, onPick),
@@ -72,6 +80,7 @@ export function ViewportCanvas({
       className="viewport-canvas"
       ref={hostRef}
       data-testid="viewport-canvas"
+      data-selection-mode={selectionMode}
       tabIndex={0}
       onPointerDown={(event) => event.currentTarget.focus()}
     >

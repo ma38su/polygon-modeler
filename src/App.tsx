@@ -253,21 +253,28 @@ export default function App() {
           <div className="selection-mode-bar" aria-label="選択モード">
             {(
               [
-                ["object", "Object"],
-                ["vertex", "Vertex"],
-                ["edge", "Edge"],
-                ["face", "Face"],
+                ["object", "Object", "オブジェクト全体を選択"],
+                ["vertex", "Vertex", "頂点を選択（Shiftで複数選択）"],
+                ["edge", "Edge", "辺を選択（Shiftで複数選択）"],
+                ["face", "Face", "面を選択（Shiftで複数選択）"],
               ] as const
-            ).map(([mode, label]) => (
+            ).map(([mode, label, description]) => (
               <button
                 type="button"
                 key={mode}
                 className={snapshot.selectionMode === mode ? "active" : ""}
+                aria-pressed={snapshot.selectionMode === mode}
+                title={description}
                 onClick={() => editor.setSelectionMode(mode)}
               >
                 {label}
               </button>
             ))}
+          </div>
+          <div className="selection-mode-hint" aria-live="polite">
+            {snapshot.selectionMode === "object"
+              ? "Object: オブジェクト全体"
+              : `${snapshot.selectionMode}: Shift+クリックで複数選択`}
           </div>
           <div className="viewport-toolbar" aria-label="ビューポート設定">
             <button
@@ -295,6 +302,7 @@ export default function App() {
             transformMode={transformMode}
             onTransformCommit={handleTransformCommit}
             selectionMode={snapshot.selectionMode}
+            selectionItems={snapshot.selectionItems}
             onPick={handlePick}
           />
           {contextMenu && (

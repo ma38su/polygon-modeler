@@ -30,11 +30,22 @@ test("shows the empty editor shell", async ({ page }) => {
   await expect(page.getByText("頂点: 8")).toBeVisible();
   await expect(page.getByText("面: 6")).toBeVisible();
   await page.getByRole("button", { name: "Vertex" }).click();
+  await expect(page.getByTestId("viewport-canvas")).toHaveAttribute(
+    "data-selection-mode",
+    "vertex",
+  );
+  await expect(
+    page.getByText("vertex: Shift+クリックで複数選択"),
+  ).toBeVisible();
   await page.keyboard.press("ControlOrMeta+A");
   await expect(page.getByText("選択: 8")).toBeVisible();
   await page.keyboard.press("Alt+A");
   await expect(page.getByText("選択: 0")).toBeVisible();
   await page.getByRole("button", { name: "Edge" }).click();
+  await expect(page.getByTestId("viewport-canvas")).toHaveAttribute(
+    "data-selection-mode",
+    "edge",
+  );
   await page.keyboard.press("ControlOrMeta+A");
   await expect(page.getByText("選択: 12")).toBeVisible();
   await page.getByRole("button", { name: "Face" }).click();
