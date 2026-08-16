@@ -62,7 +62,7 @@ describe("RenderGeometryAdapter selection overlays", () => {
     adapter.dispose();
   });
 
-  it("renders visible vertices larger and selected vertices largest", () => {
+  it("renders visible and selected vertices at the same size", () => {
     const adapter = new RenderGeometryAdapter();
     const object = createSnapshot();
     adapter.sync(
@@ -83,8 +83,8 @@ describe("RenderGeometryAdapter selection overlays", () => {
     selection.geometry.computeBoundingSphere();
     expect(vertices.count).toBe(object.mesh.vertexIds.length);
     expect(selection.count).toBe(1);
-    expect(vertices.geometry.boundingSphere!.radius).toBeGreaterThan(0.05);
-    expect(selection.geometry.boundingSphere!.radius).toBeGreaterThan(
+    expect(vertices.geometry.boundingSphere!.radius).toBeGreaterThan(0.02);
+    expect(selection.geometry.boundingSphere!.radius).toBeCloseTo(
       vertices.geometry.boundingSphere!.radius,
     );
     adapter.dispose();

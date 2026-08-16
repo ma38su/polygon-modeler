@@ -29,9 +29,8 @@ import {
 const OVERLAY_NAME = "selection-overlay";
 const baseColor = new Color(0x6f7d91);
 const vertexColor = new Color(0xd7e2f2);
-const selectedColor = new Color(0xffb84d);
-const VERTEX_RADIUS = 0.065;
-const SELECTED_VERTEX_RADIUS = 0.1;
+const selectedColor = new Color(0x55d98b);
+const VERTEX_RADIUS = 0.025;
 
 export class RenderGeometryAdapter {
   readonly group = new Group();
@@ -187,7 +186,7 @@ export class RenderGeometryAdapter {
     const selectedVertices = this.#createVertexMarkers(
       object,
       selectedIndices,
-      SELECTED_VERTEX_RADIUS,
+      VERTEX_RADIUS,
       selectedColor,
     );
     selectedVertices.name = "vertex-selection-overlay";
