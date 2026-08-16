@@ -1,6 +1,11 @@
 # Polygon Modeler
 
+[![GitHub Pages deployment](https://github.com/ma38su/polygon-modeler/actions/workflows/deploy-pages.yml/badge.svg)](https://github.com/ma38su/polygon-modeler/actions/workflows/deploy-pages.yml)
+[![Open Polygon Modeler](https://img.shields.io/badge/Open-Polygon_Modeler-4f7cff?logo=github)](https://ma38su.github.io/polygon-modeler/)
+
 ブラウザ内で完結するローカルファーストのポリゴンモデラーです。実装計画のPhase 0〜11を完了したMVPです。Box、Plane、Cylinderからポリゴン編集を始め、独自形式で保存し、GLB / STLとして出力できます。
+
+公開版: [https://ma38su.github.io/polygon-modeler/](https://ma38su.github.io/polygon-modeler/)
 
 ## 開発
 
