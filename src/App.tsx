@@ -100,6 +100,11 @@ export default function App() {
       editor.transformObject(...args),
     [editor],
   );
+  const handleElementTranslateCommit = useCallback(
+    (...args: Parameters<typeof editor.translateSelectedInWorld>) =>
+      editor.translateSelectedInWorld(...args),
+    [editor],
+  );
   const handlePick = useCallback(
     (item: Parameters<typeof editor.selectElement>[0], additive: boolean) =>
       editor.selectElement(item, additive),
@@ -339,6 +344,7 @@ export default function App() {
             selectedObjectIds={snapshot.selectedObjectIds}
             transformMode={transformMode}
             onTransformCommit={handleTransformCommit}
+            onElementTranslateCommit={handleElementTranslateCommit}
             selectionMode={snapshot.selectionMode}
             selectionItems={snapshot.selectionItems}
             displayLayers={displayLayers}

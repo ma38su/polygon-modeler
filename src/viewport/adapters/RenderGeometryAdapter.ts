@@ -1,6 +1,7 @@
 import {
   BufferGeometry,
   Color,
+  DoubleSide,
   Float32BufferAttribute,
   Group,
   InstancedMesh,
@@ -116,6 +117,7 @@ export class RenderGeometryAdapter {
         color: 0x9aa5b5,
         roughness: 0.72,
         metalness: 0.05,
+        side: DoubleSide,
       }),
     );
   }

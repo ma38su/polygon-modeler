@@ -4,10 +4,12 @@ import {
   GridHelper,
   HemisphereLight,
   OrthographicCamera,
+  Object3D,
   PerspectiveCamera,
   Scene,
   WebGLRenderer,
   type Camera,
+  Vector3,
 } from "three";
 import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
 import { TransformControls } from "three/examples/jsm/controls/TransformControls.js";
@@ -16,6 +18,7 @@ import type {
   ModelObjectSnapshot,
   ObjectId,
   TransformValue,
+  Vector3Value,
 } from "../editor/document/types";
 import { RenderGeometryAdapter } from "./adapters/RenderGeometryAdapter";
 import { CpuPicker } from "./picking/CpuPicker";
@@ -46,12 +49,14 @@ export type TransformCommitListener = (
   before: TransformValue,
   after: TransformValue,
 ) => void;
+export type ElementTranslateCommitListener = (delta: Vector3Value) => void;
 
 export class Viewport {
   readonly element: HTMLElement;
   readonly #scene = new Scene();
   readonly #geometryAdapter = new RenderGeometryAdapter();
   readonly #picker = new CpuPicker();
+  readonly #elementPivot = new Object3D();
   readonly #perspectiveCamera = new PerspectiveCamera(45, 1, 0.01, 10_000);
   readonly #orthographicCamera = new OrthographicCamera(
     -5,
@@ -69,10 +74,12 @@ export class Viewport {
   #transformControls?: TransformControls;
   #transformMode: TransformMode = "translate";
   #transformCommitListener?: TransformCommitListener;
+  #elementTranslateCommitListener?: ElementTranslateCommitListener;
   #selectedObjectId?: ObjectId;
   #transformBefore?: TransformValue;
   #objects: readonly ModelObjectSnapshot[] = [];
   #selectionMode: SelectionMode = "object";
+  #selectionItems: readonly SelectionItem[] = [];
   #pickListener?: (item: SelectionItem | undefined, additive: boolean) => void;
   #pointerStart?: { x: number; y: number };
   #animationFrame?: number;
@@ -86,6 +93,7 @@ export class Viewport {
     this.#scene.add(new AxesHelper(2));
     this.#scene.add(new HemisphereLight(0xffffff, 0x28303d, 1.5));
     this.#scene.add(this.#geometryAdapter.group);
+    this.#scene.add(this.#elementPivot);
     this.#perspectiveCamera.position.set(6, 5, 8);
     this.#orthographicCamera.position.copy(this.#perspectiveCamera.position);
 
@@ -156,6 +164,7 @@ export class Viewport {
     );
     this.#objects = objects;
     this.#selectionMode = selectionMode;
+    this.#selectionItems = selectionItems;
     this.#selectedObjectId = selectedIds.values().next().value;
     this.#attachSelectedObject();
   }
@@ -170,10 +179,17 @@ export class Viewport {
   setTransformMode(mode: TransformMode): void {
     this.#transformMode = mode;
     this.#transformControls?.setMode(mode);
+    this.#attachSelectedObject();
   }
 
   setTransformCommitListener(listener: TransformCommitListener): void {
     this.#transformCommitListener = listener;
+  }
+
+  setElementTranslateCommitListener(
+    listener: ElementTranslateCommitListener,
+  ): void {
+    this.#elementTranslateCommitListener = listener;
   }
 
   dispose(): void {
@@ -299,10 +315,33 @@ export class Viewport {
         ? this.#geometryAdapter.getMesh(this.#selectedObjectId)
         : undefined;
     if (mesh) this.#transformControls.attach(mesh);
-    else this.#transformControls.detach();
+    else if (
+      this.#selectionMode !== "object" &&
+      this.#transformMode === "translate" &&
+      this.#selectionItems.length > 0
+    ) {
+      const pivot = this.#selectionPivotWorld();
+      if (!pivot) this.#transformControls.detach();
+      else {
+        this.#elementPivot.position.copy(pivot);
+        this.#transformControls.attach(this.#elementPivot);
+      }
+    } else this.#transformControls.detach();
   }
 
   #handleTransformStart = (): void => {
+    if (this.#transformControls?.object === this.#elementPivot) {
+      this.#transformBefore = {
+        position: {
+          x: this.#elementPivot.position.x,
+          y: this.#elementPivot.position.y,
+          z: this.#elementPivot.position.z,
+        },
+        rotation: { x: 0, y: 0, z: 0 },
+        scale: { x: 1, y: 1, z: 1 },
+      };
+      return;
+    }
     const mesh = this.#selectedObjectId
       ? this.#geometryAdapter.getMesh(this.#selectedObjectId)
       : undefined;
@@ -310,6 +349,22 @@ export class Viewport {
   };
 
   #handleTransformEnd = (): void => {
+    if (
+      this.#transformControls?.object === this.#elementPivot &&
+      this.#transformBefore
+    ) {
+      const before = this.#transformBefore.position;
+      const delta = {
+        x: this.#elementPivot.position.x - before.x,
+        y: this.#elementPivot.position.y - before.y,
+        z: this.#elementPivot.position.z - before.z,
+      };
+      this.#elementPivot.position.set(before.x, before.y, before.z);
+      this.#transformBefore = undefined;
+      if (Math.hypot(delta.x, delta.y, delta.z) > Number.EPSILON)
+        this.#elementTranslateCommitListener?.(delta);
+      return;
+    }
     const id = this.#selectedObjectId;
     const mesh = id ? this.#geometryAdapter.getMesh(id) : undefined;
     if (id && mesh && this.#transformBefore) {
@@ -321,6 +376,50 @@ export class Viewport {
     }
     this.#transformBefore = undefined;
   };
+
+  #selectionPivotWorld(): Vector3 | undefined {
+    const points: Vector3[] = [];
+    for (const object of this.#objects) {
+      const mesh = this.#geometryAdapter.getMesh(object.id);
+      if (!mesh) continue;
+      mesh.updateWorldMatrix(true, false);
+      for (const index of this.#selectedVertexIndices(object))
+        points.push(
+          new Vector3()
+            .fromArray(object.mesh.positions, index * 3)
+            .applyMatrix4(mesh.matrixWorld),
+        );
+    }
+    if (!points.length) return undefined;
+    return points
+      .reduce((sum, point) => sum.add(point), new Vector3())
+      .multiplyScalar(1 / points.length);
+  }
+
+  #selectedVertexIndices(object: ModelObjectSnapshot): Set<number> {
+    const result = new Set<number>();
+    const selected = new Set(
+      this.#selectionItems
+        .filter((item) => item.objectId === object.id)
+        .map((item) => item.elementId),
+    );
+    if (this.#selectionMode === "vertex")
+      object.mesh.vertexIds.forEach((id, index) => {
+        if (selected.has(id)) result.add(index);
+      });
+    else if (this.#selectionMode === "edge")
+      object.mesh.edges.forEach((edge) => {
+        if (!selected.has(edge.id)) return;
+        result.add(edge.vertices[0]);
+        result.add(edge.vertices[1]);
+      });
+    else if (this.#selectionMode === "face")
+      object.mesh.faceIds.forEach((id, index) => {
+        if (!selected.has(id)) return;
+        object.mesh.faces[index]?.forEach((vertex) => result.add(vertex));
+      });
+    return result;
+  }
 
   #readTransform(mesh: import("three").Mesh): TransformValue {
     return {

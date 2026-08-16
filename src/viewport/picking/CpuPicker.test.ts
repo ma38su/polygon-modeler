@@ -3,6 +3,7 @@ import { PerspectiveCamera, Vector3 } from "three";
 import { ModelObject } from "../../editor/document/ModelObject";
 import type { ObjectId } from "../../editor/document/types";
 import { createBoxMesh } from "../../editor/mesh/primitives/box";
+import { createPlaneMesh } from "../../editor/mesh/primitives/plane";
 import { RenderGeometryAdapter } from "../adapters/RenderGeometryAdapter";
 import { CpuPicker } from "./CpuPicker";
 
@@ -44,6 +45,54 @@ describe("CpuPicker vertex hit area", () => {
     expect(
       picker.pick(x + 4.1, y, bounds, camera, adapter, [object], "vertex"),
     ).toBeUndefined();
+    adapter.dispose();
+  });
+});
+
+describe("CpuPicker face picking", () => {
+  it("picks a newly created upward-facing plane from above", () => {
+    const object = new ModelObject(
+      objectId,
+      "Plane",
+      createPlaneMesh(),
+    ).toSnapshot();
+    const adapter = new RenderGeometryAdapter();
+    const [a, b, c] = object.mesh.faces[0]!.map((index) =>
+      new Vector3().fromArray(object.mesh.positions, index * 3),
+    );
+    expect(
+      new Vector3().subVectors(b!, a!).cross(new Vector3().subVectors(c!, a!))
+        .y,
+    ).toBeGreaterThan(0);
+    adapter.sync([object], new Set(), "face", [], {
+      vertices: false,
+      edges: false,
+      faces: true,
+    });
+    adapter.group.updateMatrixWorld(true);
+    const camera = new PerspectiveCamera(45, 1, 0.01, 100);
+    camera.position.set(0, 5, 0);
+    camera.up.set(0, 0, -1);
+    camera.lookAt(0, 0, 0);
+    camera.updateMatrixWorld();
+    const bounds = {
+      left: 0,
+      top: 0,
+      width: 500,
+      height: 500,
+    } as DOMRect;
+
+    expect(
+      new CpuPicker().pick(
+        250,
+        250,
+        bounds,
+        camera,
+        adapter,
+        [object],
+        "face",
+      )?.elementId,
+    ).toBe(object.mesh.faceIds[0]);
     adapter.dispose();
   });
 });

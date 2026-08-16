@@ -20,6 +20,7 @@ export interface ViewportCanvasProps {
   selectedObjectIds: ReadonlySet<ObjectId>;
   transformMode: TransformMode;
   onTransformCommit: TransformCommitListener;
+  onElementTranslateCommit(delta: import("../editor/document/types").Vector3Value): void;
   selectionMode: SelectionMode;
   selectionItems: readonly SelectionItem[];
   displayLayers: DisplayLayers;
@@ -33,6 +34,7 @@ export function ViewportCanvas({
   selectedObjectIds,
   transformMode,
   onTransformCommit,
+  onElementTranslateCommit,
   selectionMode,
   selectionItems,
   displayLayers,
@@ -51,12 +53,13 @@ export function ViewportCanvas({
     });
     viewportRef.current = viewport;
     viewport.setTransformCommitListener(onTransformCommit);
+    viewport.setElementTranslateCommitListener(onElementTranslateCommit);
     void viewport.initialize();
     return () => {
       viewportRef.current = null;
       viewport.dispose();
     };
-  }, [onStatusChange, onTransformCommit]);
+  }, [onElementTranslateCommit, onStatusChange, onTransformCommit]);
 
   useEffect(() => viewportRef.current?.setProjection(projection), [projection]);
   useEffect(

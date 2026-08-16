@@ -188,12 +188,42 @@ export class Editor {
     this.#commit(true);
   }
   translateSelected(delta: Vector3Value): void {
+    this.#translateSelected(() => delta);
+  }
+  translateSelectedInWorld(delta: Vector3Value): void {
+    this.#translateSelected((objectId) => {
+      const object = this.document.getObject(objectId);
+      if (!object) return delta;
+      const { rotation, scale } = object.transform;
+      const [cx, sx, cy, sy, cz, sz] = [
+        Math.cos(rotation.x),
+        Math.sin(rotation.x),
+        Math.cos(rotation.y),
+        Math.sin(rotation.y),
+        Math.cos(rotation.z),
+        Math.sin(rotation.z),
+      ];
+      let { x, y, z } = delta;
+      [x, y] = [x * cz + y * sz, -x * sz + y * cz];
+      [x, z] = [x * cy - z * sy, x * sy + z * cy];
+      [y, z] = [y * cx + z * sx, -y * sx + z * cx];
+      return {
+        x: x / scale.x,
+        y: y / scale.y,
+        z: z / scale.z,
+      };
+    });
+  }
+  #translateSelected(
+    deltaForObject: (objectId: ObjectId) => Vector3Value,
+  ): void {
     const commands: EditMeshCommand[] = [];
     for (const objectId of new Set(
       this.selection.items.map((item) => item.objectId),
     )) {
       const object = this.document.getObject(objectId);
       if (!object) continue;
+      const delta = deltaForObject(objectId);
       const ids = this.#selectedVertices(objectId);
       const after = object.mesh.clone();
       after.transformVertices(ids, (position) => ({

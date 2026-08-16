@@ -51,6 +51,65 @@ describe("Editor", () => {
     editor.undo();
     expect(editor.getSnapshot().objects[0]!.mesh.positions[0]).toBe(-1);
   });
+  it.each(["vertex", "edge", "face"] as const)(
+    "moves a selected %s through the shared element transform path",
+    (mode) => {
+      const editor = new Editor();
+      const objectId = editor.createBox();
+      editor.setSelectionMode(mode);
+      const mesh = editor.getSnapshot().objects[0]!.mesh;
+      const elementId =
+        mode === "vertex"
+          ? mesh.vertexIds[0]!
+          : mode === "edge"
+            ? mesh.edges[0]!.id
+            : mesh.faceIds[0]!;
+      editor.selectElement({ objectId, elementId });
+      editor.translateSelected({ x: 0, y: 2, z: 0 });
+      expect(editor.getSnapshot().objects[0]!.mesh.positions).not.toEqual(
+        mesh.positions,
+      );
+      editor.undo();
+      expect(editor.getSnapshot().objects[0]!.mesh.positions).toEqual(
+        mesh.positions,
+      );
+    },
+  );
+  it("moves multiple selected faces as one undoable edit", () => {
+    const editor = new Editor();
+    const objectId = editor.createBox();
+    editor.setSelectionMode("face");
+    const mesh = editor.getSnapshot().objects[0]!.mesh;
+    editor.selectElement({ objectId, elementId: mesh.faceIds[0]! });
+    editor.selectElement(
+      { objectId, elementId: mesh.faceIds[1]! },
+      true,
+    );
+    editor.translateSelected({ x: 1, y: 0, z: 0 });
+    expect(editor.getSnapshot().objects[0]!.mesh.positions).not.toEqual(
+      mesh.positions,
+    );
+    editor.undo();
+    expect(editor.getSnapshot().objects[0]!.mesh.positions).toEqual(
+      mesh.positions,
+    );
+  });
+  it("converts gizmo movement from world space into object-local space", () => {
+    const editor = new Editor();
+    const objectId = editor.createBox();
+    editor.transformObject(objectId, {
+      position: { x: 0, y: 0, z: 0 },
+      rotation: { x: 0, y: 0, z: Math.PI / 2 },
+      scale: { x: 2, y: 2, z: 2 },
+    });
+    editor.setSelectionMode("vertex");
+    const mesh = editor.getSnapshot().objects[0]!.mesh;
+    editor.selectElement({ objectId, elementId: mesh.vertexIds[0]! });
+    editor.translateSelectedInWorld({ x: 2, y: 0, z: 0 });
+    const moved = editor.getSnapshot().objects[0]!.mesh.positions;
+    expect(moved[0]).toBeCloseTo(mesh.positions[0]!);
+    expect(moved[1]).toBeCloseTo(mesh.positions[1]! - 1);
+  });
   it("restores topology and selection when element deletion is undone", () => {
     const editor = new Editor();
     const objectId = editor.createBox();

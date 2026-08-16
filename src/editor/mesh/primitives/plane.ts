@@ -8,6 +8,6 @@ export function createPlaneMesh(size = 2): EditableMesh {
       { x: h, y: 0, z: h },
       { x: -h, y: 0, z: h },
     ],
-    [[0, 1, 2, 3]],
+    [[0, 3, 2, 1]],
   );
 }
