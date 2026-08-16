@@ -38,3 +38,9 @@ npm run test:e2e
 - Firefox / Safariの現行安定版（WebGL 2フォールバック）
 
 自動ブラウザ回帰テストはChromiumで実施しています。他ブラウザはWebGL 2の手動スモークテスト対象です。
+
+## GitHub Pagesへのデプロイ
+
+`main`へのpushまたは手動実行で、GitHub Actionsがlint、型検査、単体テスト、Chromium E2E、Production buildを実行し、成功した`dist`をGitHub Pagesへ公開します。リポジトリ配下のURLではリポジトリ名をViteのベースパスとして自動設定し、`<owner>.github.io`リポジトリではルートパスを使用します。
+
+初回のみGitHubリポジトリのSettings → Pages → Build and deployment → Sourceで`GitHub Actions`を選択してください。ワークフローは[deploy-pages.yml](.github/workflows/deploy-pages.yml)です。
