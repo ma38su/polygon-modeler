@@ -1,5 +1,18 @@
 import { expect, test } from "@playwright/test";
 
+test("keeps header actions on one line at narrow window widths", async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 800, height: 700 });
+  await page.goto("/?renderer=webgl2");
+  const header = page.locator(".app-header");
+  await expect(header).toHaveCSS("height", "48px");
+  for (const button of await header.getByRole("button").all()) {
+    await expect(button).toHaveCSS("white-space", "nowrap");
+    expect((await button.boundingBox())?.height).toBeLessThanOrEqual(36);
+  }
+});
+
 test("shows the empty editor shell", async ({ page }) => {
   await page.goto("/?renderer=webgl2");
   await expect(page.getByLabel("3D ビューポート")).toBeVisible();

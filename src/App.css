@@ -23,7 +23,7 @@ button {
 }
 .app-header {
   display: grid;
-  grid-template-columns: 220px 1fr auto;
+  grid-template-columns: max-content minmax(0, 1fr) max-content;
   align-items: center;
   border-bottom: 1px solid var(--border);
   background: var(--surface-1);
@@ -37,6 +37,7 @@ button {
   font-size: 14px;
   font-weight: 650;
   letter-spacing: 0.02em;
+  white-space: nowrap;
 }
 .brand-mark {
   width: 18px;
@@ -53,9 +54,18 @@ button {
   display: flex;
   align-items: center;
   gap: 2px;
+  min-width: 0;
+}
+.menu-bar {
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+.menu-bar::-webkit-scrollbar {
+  display: none;
 }
 .menu-bar button,
 .history-actions button {
+  flex: 0 0 auto;
   display: inline-flex;
   align-items: center;
   gap: 5px;
@@ -64,6 +74,7 @@ button {
   border-radius: 5px;
   color: var(--text-secondary);
   background: transparent;
+  white-space: nowrap;
 }
 .menu-bar svg {
   width: 12px;
@@ -80,6 +91,7 @@ button {
 }
 .history-actions {
   padding-right: 10px;
+  white-space: nowrap;
 }
 .include-hidden {
   display: flex;
