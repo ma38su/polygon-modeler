@@ -19,6 +19,13 @@ test("keeps header actions on one line at narrow window widths", async ({
     "font-size",
     "11px",
   );
+  const selectionBox = await page.getByLabel("選択モード").boundingBox();
+  const displayBox = await page.getByLabel("表示レイヤー").boundingBox();
+  expect(selectionBox).not.toBeNull();
+  expect(displayBox).not.toBeNull();
+  expect(displayBox!.y).toBeGreaterThanOrEqual(
+    selectionBox!.y + selectionBox!.height,
+  );
 });
 
 test("shows the empty editor shell", async ({ page }) => {
@@ -37,7 +44,32 @@ test("shows the empty editor shell", async ({ page }) => {
   ).toBeVisible();
   await expect(page.getByText("頂点: 8")).toBeVisible();
   await expect(page.getByText("面: 6")).toBeVisible();
-  await page.getByRole("button", { name: "Vertex" }).click();
+  const displayLayers = page.getByLabel("表示レイヤー");
+  await expect(
+    displayLayers.getByRole("button", { name: "Vertex" }),
+  ).toHaveAttribute("aria-pressed", "false");
+  await displayLayers.getByRole("button", { name: "Vertex" }).click();
+  await expect(page.getByTestId("viewport-canvas")).toHaveAttribute(
+    "data-display-vertices",
+    "true",
+  );
+  await expect(page.getByTestId("viewport-canvas")).toHaveAttribute(
+    "data-selection-mode",
+    "object",
+  );
+  await displayLayers.getByRole("button", { name: "Edge" }).click();
+  await displayLayers.getByRole("button", { name: "Face" }).click();
+  await expect(page.getByTestId("viewport-canvas")).toHaveAttribute(
+    "data-display-edges",
+    "true",
+  );
+  await expect(page.getByTestId("viewport-canvas")).toHaveAttribute(
+    "data-display-faces",
+    "false",
+  );
+  await displayLayers.getByRole("button", { name: "Face" }).click();
+  const selectionModes = page.getByLabel("選択モード");
+  await selectionModes.getByRole("button", { name: "Vertex" }).click();
   await expect(page.getByTestId("viewport-canvas")).toHaveAttribute(
     "data-selection-mode",
     "vertex",
@@ -49,14 +81,14 @@ test("shows the empty editor shell", async ({ page }) => {
   await expect(page.getByText("選択: 8")).toBeVisible();
   await page.keyboard.press("Alt+A");
   await expect(page.getByText("選択: 0")).toBeVisible();
-  await page.getByRole("button", { name: "Edge" }).click();
+  await selectionModes.getByRole("button", { name: "Edge" }).click();
   await expect(page.getByTestId("viewport-canvas")).toHaveAttribute(
     "data-selection-mode",
     "edge",
   );
   await page.keyboard.press("ControlOrMeta+A");
   await expect(page.getByText("選択: 12")).toBeVisible();
-  await page.getByRole("button", { name: "Face" }).click();
+  await selectionModes.getByRole("button", { name: "Face" }).click();
   await page.keyboard.press("ControlOrMeta+A");
   await page.keyboard.press("Delete");
   await expect(page.getByText("面: 0")).toBeVisible();
@@ -101,7 +133,10 @@ test("previews, cancels, commits, and replays a face extrusion", async ({
 }) => {
   await page.goto("/?renderer=webgl2");
   await page.getByRole("button", { name: "Plane追加" }).click();
-  await page.getByRole("button", { name: "Face" }).click();
+  await page
+    .getByLabel("選択モード")
+    .getByRole("button", { name: "Face" })
+    .click();
   await page.keyboard.press("ControlOrMeta+A");
 
   const distance = page.getByLabel("押し出し量");
@@ -130,9 +165,9 @@ test("coordinates viewport focus, shortcuts, context menu, and dirty state", asy
   const viewport = page.getByTestId("viewport-canvas");
   await viewport.click({ position: { x: 350, y: 250 } });
   await page.keyboard.press("4");
-  await expect(page.getByRole("button", { name: "Face" })).toHaveClass(
-    /active/,
-  );
+  await expect(
+    page.getByLabel("選択モード").getByRole("button", { name: "Face" }),
+  ).toHaveClass(/active/);
   await page.keyboard.press("r");
   await expect(page.getByText("ツール: rotate")).toBeVisible();
 

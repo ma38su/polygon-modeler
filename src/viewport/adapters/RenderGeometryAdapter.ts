@@ -20,6 +20,10 @@ import type {
   SelectionItem,
   SelectionMode,
 } from "../../editor/selection/SelectionManager";
+import {
+  DEFAULT_DISPLAY_LAYERS,
+  type DisplayLayers,
+} from "../displayLayers";
 
 const OVERLAY_NAME = "selection-overlay";
 const baseColor = new Color(0x6f7d91);
@@ -34,6 +38,7 @@ export class RenderGeometryAdapter {
     selectedIds: ReadonlySet<ObjectId>,
     selectionMode: SelectionMode = "object",
     selectionItems: readonly SelectionItem[] = [],
+    displayLayers: DisplayLayers = DEFAULT_DISPLAY_LAYERS,
   ): void {
     const liveIds = new Set(objects.map((object) => object.id));
     for (const [id, mesh] of this.#meshes)
@@ -72,7 +77,17 @@ export class RenderGeometryAdapter {
         selectionMode === "object" && selectedIds.has(object.id);
       material.color.set(objectSelected ? 0x78a0ff : 0x9aa5b5);
       material.emissive.set(objectSelected ? 0x172a55 : 0x000000);
-      this.#syncOverlay(mesh, object, selectionMode, selectionItems);
+      material.transparent = !displayLayers.faces;
+      material.opacity = displayLayers.faces ? 1 : 0;
+      material.depthWrite = displayLayers.faces;
+      material.colorWrite = displayLayers.faces;
+      this.#syncOverlay(
+        mesh,
+        object,
+        selectionMode,
+        selectionItems,
+        displayLayers,
+      );
     }
   }
   dispose(): void {
@@ -117,13 +132,13 @@ export class RenderGeometryAdapter {
     object: ModelObjectSnapshot,
     mode: SelectionMode,
     items: readonly SelectionItem[],
+    displayLayers: DisplayLayers,
   ): void {
     const previous = mesh.getObjectByName(OVERLAY_NAME);
     if (previous) {
       mesh.remove(previous);
       this.#disposeObject(previous);
     }
-    if (mode === "object") return;
     const selected = new Set(
       items
         .filter((item) => item.objectId === object.id)
@@ -132,39 +147,66 @@ export class RenderGeometryAdapter {
     const overlay = new Group();
     overlay.name = OVERLAY_NAME;
     overlay.renderOrder = 4;
-    if (mode === "vertex") this.#addVertexOverlay(overlay, object, selected);
-    else {
+    if (displayLayers.vertices)
+      this.#addVertexOverlay(
+        overlay,
+        object,
+        selected,
+        mode === "vertex",
+      );
+    if (displayLayers.edges)
       this.#addEdgeOverlay(overlay, object, selected, mode === "edge");
-      if (mode === "face") this.#addFaceOverlay(overlay, object, selected);
-    }
+    if (displayLayers.faces && mode === "face")
+      this.#addFaceOverlay(overlay, object, selected);
+    if (overlay.children.length === 0) return;
     mesh.add(overlay);
   }
   #addVertexOverlay(
     overlay: Group,
     object: ModelObjectSnapshot,
     selected: ReadonlySet<SelectionItem["elementId"]>,
+    highlightSelection: boolean,
   ): void {
-    const colors = object.mesh.vertexIds.flatMap((id) => {
-      const color = selected.has(id) ? selectedColor : baseColor;
-      return [color.r, color.g, color.b];
-    });
     const geometry = new BufferGeometry();
     geometry.setAttribute(
       "position",
       new Float32BufferAttribute(object.mesh.positions, 3),
     );
-    geometry.setAttribute("color", new Float32BufferAttribute(colors, 3));
     const points = new Points(
       geometry,
       new PointsMaterial({
-        size: 7,
+        color: baseColor,
+        size: 11,
         sizeAttenuation: false,
-        vertexColors: true,
         depthTest: false,
       }),
     );
     points.name = "vertex-overlay";
     overlay.add(points);
+    if (!highlightSelection || selected.size === 0) return;
+    const selectedPositions = object.mesh.vertexIds.flatMap((id, index) =>
+      selected.has(id)
+        ? object.mesh.positions.slice(index * 3, index * 3 + 3)
+        : [],
+    );
+    if (selectedPositions.length === 0) return;
+    const selectedGeometry = new BufferGeometry();
+    selectedGeometry.setAttribute(
+      "position",
+      new Float32BufferAttribute(selectedPositions, 3),
+    );
+    const selectedPoints = new Points(
+      selectedGeometry,
+      new PointsMaterial({
+        color: selectedColor,
+        size: 17,
+        sizeAttenuation: false,
+        depthTest: false,
+      }),
+    );
+    selectedPoints.name = "vertex-selection-overlay";
+    selectedPoints.renderOrder = 5;
+    overlay.add(selectedPoints);
   }
   #addEdgeOverlay(
     overlay: Group,

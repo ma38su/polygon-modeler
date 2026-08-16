@@ -240,6 +240,53 @@ kbd {
   border-radius: var(--radius-lg);
   background: color-mix(in srgb, var(--surface-1), transparent 8%);
 }
+.display-layer-bar {
+  position: absolute;
+  z-index: 2;
+  top: var(--space-3);
+  right: var(--space-3);
+  display: flex;
+  align-items: center;
+  gap: var(--space-0-5);
+  padding: var(--space-1);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  background: color-mix(in srgb, var(--surface-1), transparent 8%);
+  box-shadow: var(--shadow-sm);
+}
+.display-layer-bar > span {
+  padding: 0 var(--space-1-5);
+  color: var(--text-subtle);
+  font-size: var(--font-size-2xs);
+}
+.display-layer-bar button {
+  display: flex;
+  align-items: center;
+  min-height: var(--control-sm);
+  gap: var(--space-1);
+  padding: 0 var(--space-2);
+  border: 0;
+  border-radius: var(--radius-sm);
+  color: var(--text-muted);
+  background: transparent;
+  font-size: var(--font-size-xs);
+}
+.display-layer-bar button.active {
+  color: var(--text-primary);
+  background: var(--surface-3);
+}
+.display-layer-bar svg {
+  width: var(--icon-xs);
+  height: var(--icon-xs);
+}
+@media (max-width: 1100px) {
+  .display-layer-bar {
+    top: 52px;
+  }
+  .selection-mode-hint {
+    top: 92px;
+  }
+}
 .selection-mode-hint {
   position: absolute;
   z-index: 2;

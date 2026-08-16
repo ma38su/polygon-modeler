@@ -25,6 +25,10 @@ import {
 import { ViewportCanvas } from "./viewport/ViewportCanvas";
 import type { ViewportStatus } from "./viewport/Viewport";
 import type { TransformMode } from "./viewport/Viewport";
+import {
+  DEFAULT_DISPLAY_LAYERS,
+  type DisplayLayers,
+} from "./viewport/displayLayers";
 import { useEditor, useEditorSnapshot } from "./app/useEditor";
 import { useEditorShortcuts } from "./app/shortcuts/useEditorShortcuts";
 import { TransformInspector } from "./ui/inspector/TransformInspector";
@@ -53,6 +57,9 @@ export default function App() {
   );
   const [transformMode, setTransformMode] =
     useState<TransformMode>("translate");
+  const [displayLayers, setDisplayLayers] = useState<DisplayLayers>({
+    ...DEFAULT_DISPLAY_LAYERS,
+  });
   const [showShortcuts, setShowShortcuts] = useState(false);
   const [includeHidden, setIncludeHidden] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string>();
@@ -276,6 +283,37 @@ export default function App() {
               ? "Object: オブジェクト全体"
               : `${snapshot.selectionMode}: Shift+クリックで複数選択`}
           </div>
+          <div className="display-layer-bar" aria-label="表示レイヤー">
+            <span>表示</span>
+            {(
+              [
+                ["vertices", "Vertex", "頂点"],
+                ["edges", "Edge", "辺"],
+                ["faces", "Face", "面"],
+              ] as const
+            ).map(([layer, label, japaneseLabel]) => {
+              const visible = displayLayers[layer];
+              const VisibilityIcon = visible ? Eye : EyeOff;
+              return (
+                <button
+                  type="button"
+                  key={layer}
+                  className={visible ? "active" : ""}
+                  aria-pressed={visible}
+                  title={`${japaneseLabel}を${visible ? "非表示" : "表示"}`}
+                  onClick={() =>
+                    setDisplayLayers((current) => ({
+                      ...current,
+                      [layer]: !current[layer],
+                    }))
+                  }
+                >
+                  <VisibilityIcon aria-hidden="true" />
+                  {label}
+                </button>
+              );
+            })}
+          </div>
           <div className="viewport-toolbar" aria-label="ビューポート設定">
             <button
               type="button"
@@ -303,6 +341,7 @@ export default function App() {
             onTransformCommit={handleTransformCommit}
             selectionMode={snapshot.selectionMode}
             selectionItems={snapshot.selectionItems}
+            displayLayers={displayLayers}
             onPick={handlePick}
           />
           {contextMenu && (

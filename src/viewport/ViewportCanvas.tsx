@@ -11,6 +11,7 @@ import type {
   SelectionItem,
   SelectionMode,
 } from "../editor/selection/SelectionManager";
+import type { DisplayLayers } from "./displayLayers";
 
 export interface ViewportCanvasProps {
   onStatusChange(status: ViewportStatus): void;
@@ -21,6 +22,7 @@ export interface ViewportCanvasProps {
   onTransformCommit: TransformCommitListener;
   selectionMode: SelectionMode;
   selectionItems: readonly SelectionItem[];
+  displayLayers: DisplayLayers;
   onPick(item: SelectionItem | undefined, additive: boolean): void;
 }
 
@@ -33,6 +35,7 @@ export function ViewportCanvas({
   onTransformCommit,
   selectionMode,
   selectionItems,
+  displayLayers,
   onPick,
 }: ViewportCanvasProps) {
   const hostRef = useRef<HTMLDivElement>(null);
@@ -63,8 +66,9 @@ export function ViewportCanvas({
         selectedObjectIds,
         selectionMode,
         selectionItems,
+        displayLayers,
       ),
-    [objects, selectedObjectIds, selectionItems, selectionMode],
+    [displayLayers, objects, selectedObjectIds, selectionItems, selectionMode],
   );
   useEffect(
     () => viewportRef.current?.setPicking(selectionMode, onPick),
@@ -81,6 +85,9 @@ export function ViewportCanvas({
       ref={hostRef}
       data-testid="viewport-canvas"
       data-selection-mode={selectionMode}
+      data-display-vertices={displayLayers.vertices}
+      data-display-edges={displayLayers.edges}
+      data-display-faces={displayLayers.faces}
       tabIndex={0}
       onPointerDown={(event) => event.currentTarget.focus()}
     >

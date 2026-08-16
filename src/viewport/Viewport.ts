@@ -23,6 +23,7 @@ import type {
   SelectionItem,
   SelectionMode,
 } from "../editor/selection/SelectionManager";
+import type { DisplayLayers } from "./displayLayers";
 import {
   canUseWebGpu,
   getRendererPreference,
@@ -144,12 +145,14 @@ export class Viewport {
     selectedIds: ReadonlySet<ObjectId>,
     selectionMode: SelectionMode,
     selectionItems: readonly SelectionItem[],
+    displayLayers: DisplayLayers,
   ): void {
     this.#geometryAdapter.sync(
       objects,
       selectedIds,
       selectionMode,
       selectionItems,
+      displayLayers,
     );
     this.#objects = objects;
     this.#selectionMode = selectionMode;
