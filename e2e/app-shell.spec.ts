@@ -57,6 +57,7 @@ test("shows the empty editor shell", async ({ page }) => {
   ).toBeVisible();
   await expect(page.getByText("頂点: 8")).toBeVisible();
   await expect(page.getByText("面: 6")).toBeVisible();
+  await expect(page.getByLabel("メッシュ診断")).toContainText("境界Edge0");
   const displayLayers = page.getByLabel("表示レイヤー");
   await expect(
     displayLayers.getByRole("button", { name: "Vertex" }),
@@ -75,6 +76,11 @@ test("shows the empty editor shell", async ({ page }) => {
   );
   await displayLayers.getByRole("button", { name: "Vertex" }).click();
   await displayLayers.getByRole("button", { name: "Face" }).click();
+  await displayLayers.getByRole("button", { name: "Normal" }).click();
+  await expect(page.getByTestId("viewport-canvas")).toHaveAttribute(
+    "data-display-normals",
+    "true",
+  );
   await expect(page.getByTestId("viewport-canvas")).toHaveAttribute(
     "data-display-edges",
     "true",

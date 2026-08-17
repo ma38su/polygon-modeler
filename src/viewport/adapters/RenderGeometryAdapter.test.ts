@@ -107,4 +107,20 @@ describe("RenderGeometryAdapter selection overlays", () => {
     expect(selectedFaces.geometry.getIndex()?.count).toBe(12);
     adapter.dispose();
   });
+
+  it("renders face normals only when the diagnostic layer is enabled", () => {
+    const adapter = new RenderGeometryAdapter();
+    const object = createSnapshot();
+    adapter.sync([object], new Set(), [], {
+      vertices: false,
+      edges: false,
+      faces: true,
+      normals: true,
+    });
+    const normals = adapter
+      .getOverlay(objectId)
+      ?.getObjectByName("normal-overlay") as import("three").LineSegments;
+    expect(normals.geometry.getAttribute("position").count).toBe(12);
+    adapter.dispose();
+  });
 });

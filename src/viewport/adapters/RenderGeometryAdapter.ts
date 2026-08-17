@@ -18,6 +18,7 @@ import type {
   ObjectId,
 } from "../../editor/document/types";
 import { triangulate } from "../../editor/mesh/triangulate";
+import { collectFaceNormalSegments } from "../../editor/mesh/meshDiagnostics";
 import type { SelectionItem } from "../../editor/selection/SelectionManager";
 import { DEFAULT_DISPLAY_LAYERS, type DisplayLayers } from "../displayLayers";
 
@@ -145,6 +146,7 @@ export class RenderGeometryAdapter {
     if (displayLayers.edges)
       this.#addEdgeOverlay(overlay, object, selected, true);
     if (displayLayers.faces) this.#addFaceOverlay(overlay, object, selected);
+    if (displayLayers.normals) this.#addNormalOverlay(overlay, object);
     if (overlay.children.length === 0) return;
     mesh.add(overlay);
   }
@@ -270,6 +272,32 @@ export class RenderGeometryAdapter {
     );
     faces.name = "face-selection-overlay";
     overlay.add(faces);
+  }
+  #addNormalOverlay(overlay: Group, object: ModelObjectSnapshot): void {
+    const positions: number[] = [];
+    const extent = object.mesh.positions.reduce(
+      (largest, value) => Math.max(largest, Math.abs(value)),
+      1,
+    );
+    const length = Math.max(0.15, extent * 0.15);
+    for (const { center, normal } of collectFaceNormalSegments(object.mesh))
+      positions.push(
+        center.x,
+        center.y,
+        center.z,
+        center.x + normal.x * length,
+        center.y + normal.y * length,
+        center.z + normal.z * length,
+      );
+    const geometry = new BufferGeometry();
+    geometry.setAttribute("position", new Float32BufferAttribute(positions, 3));
+    const normals = new LineSegments(
+      geometry,
+      new LineBasicMaterial({ color: 0x46d6c7, depthTest: false }),
+    );
+    normals.name = "normal-overlay";
+    normals.renderOrder = 6;
+    overlay.add(normals);
   }
   #disposeObject(object: import("three").Object3D): void {
     object.traverse((child) => {

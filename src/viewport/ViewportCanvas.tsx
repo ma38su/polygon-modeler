@@ -140,6 +140,7 @@ export function ViewportCanvas({
       data-display-vertices={displayLayers.vertices}
       data-display-edges={displayLayers.edges}
       data-display-faces={displayLayers.faces}
+      data-display-normals={displayLayers.normals}
       data-selection-gesture={selectionGesture}
       data-axis-constraint={axisConstraint}
       data-transform-orientation={transformOrientation}

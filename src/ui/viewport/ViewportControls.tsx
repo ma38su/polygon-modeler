@@ -7,6 +7,7 @@ import {
   Magnet,
   Minus,
   Square,
+  Waves,
 } from "lucide-react";
 import {
   SELECTION_MODES,
@@ -32,6 +33,7 @@ const displayLayerOptions = [
   ["vertices", "Vertex", "頂点"],
   ["edges", "Edge", "辺"],
   ["faces", "Face", "面"],
+  ["normals", "Normal", "法線"],
 ] as const;
 
 interface ViewportControlsProps {
@@ -86,7 +88,8 @@ export function ViewportControls({
         <span>表示</span>
         {displayLayerOptions.map(([layer, label, japaneseLabel]) => {
           const visible = displayLayers[layer];
-          const VisibilityIcon = visible ? Eye : EyeOff;
+          const VisibilityIcon =
+            layer === "normals" ? Waves : visible ? Eye : EyeOff;
           return (
             <button
               type="button"

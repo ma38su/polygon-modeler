@@ -332,6 +332,35 @@ kbd {
   background: color-mix(in srgb, var(--surface-1), transparent 8%);
   box-shadow: var(--shadow-sm);
 }
+.mesh-diagnostics {
+  margin: var(--space-3);
+  padding: var(--space-3);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--surface-1);
+}
+.mesh-diagnostics h3 {
+  margin: 0 0 var(--space-2);
+  font-size: var(--font-size-sm);
+}
+.mesh-diagnostics dl {
+  display: grid;
+  gap: var(--space-1);
+  margin: 0;
+}
+.mesh-diagnostics dl div {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--space-2);
+}
+.mesh-diagnostics dt {
+  color: var(--text-muted);
+}
+.mesh-diagnostics dd {
+  margin: 0;
+  color: var(--text-primary);
+  font-variant-numeric: tabular-nums;
+}
 .snap-toolbar > span {
   padding-left: var(--space-1-5);
   color: var(--text-subtle);
