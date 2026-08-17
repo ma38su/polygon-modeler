@@ -6,4 +6,30 @@ import babel from "@rolldown/plugin-babel";
 export default defineConfig({
   base: process.env.VITE_BASE_PATH ?? "/",
   plugins: [react(), babel({ presets: [reactCompilerPreset()] })],
+  build: {
+    rolldownOptions: {
+      output: {
+        codeSplitting: {
+          groups: [
+            {
+              name: "react-vendor",
+              test: /node_modules[\\/](react|react-dom|scheduler)[\\/]/,
+              priority: 30,
+            },
+            {
+              name: "three-vendor",
+              test: /node_modules[\\/]three[\\/]/,
+              maxSize: 400_000,
+              priority: 20,
+            },
+            {
+              name: "icon-vendor",
+              test: /node_modules[\\/]lucide-react[\\/]/,
+              priority: 10,
+            },
+          ],
+        },
+      },
+    },
+  },
 });
