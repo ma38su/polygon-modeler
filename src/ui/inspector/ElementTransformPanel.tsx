@@ -3,12 +3,16 @@ import type { Editor } from "../../editor/Editor";
 import type { ModelObjectSnapshot } from "../../editor/document/types";
 import {
   Combine,
+  Component,
   FlipVertical2,
   Layers3,
+  Maximize2,
+  Minimize2,
   Shrink,
   Scissors,
   Slice,
   SquareDashed,
+  Waypoints,
 } from "lucide-react";
 type Values = { x: number; y: number; z: number };
 type ModelingOperation = "extrude" | "inset" | "bevel";
@@ -136,6 +140,25 @@ export function ElementTransformPanel({
   );
   return (
     <div className="element-transform">
+      <fieldset className="modeling-actions selection-actions">
+        <legend>選択</legend>
+        <button type="button" onClick={() => editor.growSelection()}>
+          <Maximize2 aria-hidden="true" />
+          拡張
+        </button>
+        <button type="button" onClick={() => editor.shrinkSelection()}>
+          <Minimize2 aria-hidden="true" />
+          縮小
+        </button>
+        <button type="button" onClick={() => editor.selectConnected()}>
+          <Component aria-hidden="true" />
+          連結
+        </button>
+        <button type="button" onClick={() => editor.selectEdgeLoop()}>
+          <Waypoints aria-hidden="true" />
+          ループ
+        </button>
+      </fieldset>
       <fieldset>
         <legend>相対移動</legend>
         {fields(move, setMove)}

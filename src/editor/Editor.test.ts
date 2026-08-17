@@ -197,6 +197,31 @@ describe("Editor", () => {
       originalVertices,
     );
   });
+  it("grows, shrinks, and connects a vertex selection", () => {
+    const editor = new Editor();
+    const objectId = editor.createBox();
+    editor.setSelectionMode("vertex");
+    const vertexId = editor.getSnapshot().objects[0]!.mesh.vertexIds[0]!;
+    editor.selectElement({ objectId, elementId: vertexId });
+
+    editor.growSelection();
+    expect(editor.getSnapshot().selectionItems).toHaveLength(4);
+    editor.shrinkSelection();
+    expect(editor.getSnapshot().selectionItems).toEqual([
+      { objectId, elementId: vertexId },
+    ]);
+    editor.selectConnected();
+    expect(editor.getSnapshot().selectionItems).toHaveLength(8);
+  });
+  it("selects the opposite-edge loop across quad faces", () => {
+    const editor = new Editor();
+    const objectId = editor.createBox();
+    editor.setSelectionMode("edge");
+    const edgeId = editor.getSnapshot().objects[0]!.mesh.edges[0]!.id;
+    editor.selectElement({ objectId, elementId: edgeId });
+    editor.selectEdgeLoop();
+    expect(editor.getSnapshot().selectionItems).toHaveLength(4);
+  });
   it("converts gizmo movement from world space into object-local space", () => {
     const editor = new Editor();
     const objectId = editor.createBox();
