@@ -31,6 +31,11 @@ import { CompositeCommand } from "./commands/CompositeCommand";
 import type { EditorCommand } from "./commands/EditorCommand";
 import type { SelectionSnapshot } from "./selection/SelectionManager";
 import {
+  changeSelectionByAdjacency,
+  selectQuadEdgeLoop,
+  type AdjacencySelectionOperation,
+} from "./selection/topologySelection";
+import {
   createFace,
   bevelElements,
   extrudeFaces,
@@ -201,45 +206,11 @@ export class Editor {
           )
           .map((item) => item.elementId as EdgeId),
       );
-      const edgeByPair = new Map<string, EdgeId>();
-      for (const edge of object.mesh.edges.values()) {
-        const halfEdge = object.mesh.halfEdges.get(edge.halfEdges[0]!)!;
-        edgeByPair.set(
-          [halfEdge.origin, halfEdge.destination].sort().join(":"),
-          edge.id,
-        );
-      }
-      const queue = [...selected];
-      while (queue.length) {
-        const edgeId = queue.shift()!;
-        const edge = object.mesh.edges.get(edgeId)!;
-        for (const halfEdgeId of edge.halfEdges) {
-          const face = object.mesh.faces.get(
-            object.mesh.halfEdges.get(halfEdgeId)!.face,
-          )!;
-          if (face.vertices.length !== 4) continue;
-          const halfEdge = object.mesh.halfEdges.get(halfEdgeId)!;
-          const cursor = face.vertices.findIndex(
-            (vertex, index) =>
-              vertex === halfEdge.origin &&
-              face.vertices[(index + 1) % 4] === halfEdge.destination,
-          );
-          if (cursor < 0) continue;
-          const pair = [
-            face.vertices[(cursor + 2) % 4]!,
-            face.vertices[(cursor + 3) % 4]!,
-          ]
-            .sort()
-            .join(":");
-          const opposite = edgeByPair.get(pair);
-          if (opposite && !selected.has(opposite)) {
-            selected.add(opposite);
-            queue.push(opposite);
-          }
-        }
-      }
       result.push(
-        ...[...selected].map((elementId) => ({ objectId, elementId })),
+        ...selectQuadEdgeLoop(object.mesh, selected).map((elementId) => ({
+          objectId,
+          elementId,
+        })),
       );
     }
     this.selectElements(result);
@@ -642,74 +613,21 @@ export class Editor {
       return mesh ? { ...object, mesh: mesh.toMeshData() } : object;
     });
   }
-  #changeSelectionByAdjacency(
-    operation: "grow" | "shrink" | "connected",
-  ): void {
+  #changeSelectionByAdjacency(operation: AdjacencySelectionOperation): void {
     const result: SelectionItem[] = [];
     for (const object of this.document.objects()) {
       const current = this.selection.items.filter(
         (item) => item.objectId === object.id,
       );
       if (!current.length) continue;
-      const mesh = object.mesh;
-      const neighbors = new Map<string, Set<string>>();
-      const connect = (a: string, b: string) => {
-        if (a === b) return;
-        (neighbors.get(a) ?? neighbors.set(a, new Set()).get(a)!).add(b);
-        (neighbors.get(b) ?? neighbors.set(b, new Set()).get(b)!).add(a);
-      };
-      for (const edge of mesh.edges.values()) {
-        const halfEdge = mesh.halfEdges.get(edge.halfEdges[0]!)!;
-        connect(halfEdge.origin, halfEdge.destination);
-      }
-      const edges = [...mesh.edges.values()];
-      for (let i = 0; i < edges.length; i++)
-        for (let j = i + 1; j < edges.length; j++) {
-          const a = mesh.halfEdges.get(edges[i]!.halfEdges[0]!)!;
-          const b = mesh.halfEdges.get(edges[j]!.halfEdges[0]!)!;
-          if (
-            [a.origin, a.destination].some((id) =>
-              [b.origin, b.destination].includes(id),
-            )
-          )
-            connect(edges[i]!.id, edges[j]!.id);
-        }
-      const faces = [...mesh.faces.values()];
-      for (let i = 0; i < faces.length; i++)
-        for (let j = i + 1; j < faces.length; j++)
-          if (
-            faces[i]!.vertices.filter((id) => faces[j]!.vertices.includes(id))
-              .length >= 2
-          )
-            connect(faces[i]!.id, faces[j]!.id);
-
-      const selected = new Set(current.map((item) => item.elementId as string));
-      if (operation === "grow") {
-        for (const id of [...selected])
-          for (const neighbor of neighbors.get(id) ?? [])
-            selected.add(neighbor);
-      } else if (operation === "shrink") {
-        const beforeShrink = new Set(selected);
-        for (const id of beforeShrink)
-          if (
-            [...(neighbors.get(id) ?? [])].some(
-              (next) => !beforeShrink.has(next),
-            )
-          )
-            selected.delete(id);
-      } else {
-        const queue = [...selected];
-        while (queue.length)
-          for (const neighbor of neighbors.get(queue.shift()!) ?? [])
-            if (!selected.has(neighbor)) {
-              selected.add(neighbor);
-              queue.push(neighbor);
-            }
-      }
       result.push(
-        ...[...selected].map((elementId) => ({
+        ...changeSelectionByAdjacency(
+          object.mesh,
+          current.map((item) => item.elementId),
+          operation,
+        ).map((elementId) => ({
           objectId: object.id,
-          elementId: elementId as SelectionItem["elementId"],
+          elementId,
         })),
       );
     }

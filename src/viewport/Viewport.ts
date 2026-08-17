@@ -39,6 +39,11 @@ import { SELECTION_MODES } from "../editor/selection/SelectionManager";
 import type { DisplayLayers } from "./displayLayers";
 import { findScreenSnap } from "./snapping";
 import {
+  collectSnapCandidates,
+  selectedVertexIndices,
+  selectionPivotWorld,
+} from "./transform/elementSelection";
+import {
   canUseWebGpu,
   getRendererPreference,
   type RendererBackend,
@@ -431,7 +436,11 @@ export class Viewport {
         : undefined;
     if (mesh) this.#transformControls.attach(mesh);
     else if (this.#selectionItems.length > 0) {
-      const pivot = this.#selectionPivotWorld();
+      const pivot = selectionPivotWorld(
+        this.#objects,
+        this.#selectionItems,
+        this.#geometryAdapter,
+      );
       if (!pivot) this.#transformControls.detach();
       else {
         this.#elementPivot.position.copy(pivot);
@@ -493,7 +502,7 @@ export class Viewport {
   #captureElementPreview(): void {
     this.#elementPreview.clear();
     for (const object of this.#objects) {
-      const indices = [...this.#selectedVertexIndices(object)];
+      const indices = [...selectedVertexIndices(object, this.#selectionItems)];
       if (indices.length === 0) continue;
       const mesh = this.#geometryAdapter.getMesh(object.id);
       const position = mesh?.geometry.getAttribute("position");
@@ -570,42 +579,12 @@ export class Viewport {
   }
 
   #snapElementPivot(): void {
-    const selectedByObject = new Map<ObjectId, Set<number>>();
-    for (const object of this.#objects)
-      selectedByObject.set(object.id, this.#selectedVertexIndices(object));
-    const candidates: Vector3[] = [];
-    for (const object of this.#objects) {
-      const mesh = this.#geometryAdapter.getMesh(object.id);
-      if (!mesh || !object.visible) continue;
-      mesh.updateWorldMatrix(true, false);
-      const selected = selectedByObject.get(object.id)!;
-      const point = (index: number) =>
-        new Vector3()
-          .fromArray(object.mesh.positions, index * 3)
-          .applyMatrix4(mesh.matrixWorld);
-      if (this.#snapSettings.vertex)
-        object.mesh.vertexIds.forEach((_, index) => {
-          if (!selected.has(index)) candidates.push(point(index));
-        });
-      if (this.#snapSettings.edge)
-        object.mesh.edges.forEach((edge) => {
-          if (selected.has(edge.vertices[0]) || selected.has(edge.vertices[1]))
-            return;
-          candidates.push(
-            point(edge.vertices[0])
-              .add(point(edge.vertices[1]))
-              .multiplyScalar(0.5),
-          );
-        });
-      if (this.#snapSettings.face)
-        object.mesh.faces.forEach((face) => {
-          if (face.some((index) => selected.has(index))) return;
-          const center = face
-            .reduce((sum, index) => sum.add(point(index)), new Vector3())
-            .multiplyScalar(1 / face.length);
-          candidates.push(center);
-        });
-    }
+    const candidates = collectSnapCandidates(
+      this.#objects,
+      this.#selectionItems,
+      this.#geometryAdapter,
+      this.#snapSettings,
+    );
     const bounds = this.element.getBoundingClientRect();
     const snapped = findScreenSnap(
       this.#elementPivot.position,
@@ -720,47 +699,6 @@ export class Viewport {
       position.needsUpdate = true;
       selectedFaces.geometry.computeBoundingSphere();
     }
-  }
-
-  #selectionPivotWorld(): Vector3 | undefined {
-    const points: Vector3[] = [];
-    for (const object of this.#objects) {
-      const mesh = this.#geometryAdapter.getMesh(object.id);
-      if (!mesh) continue;
-      mesh.updateWorldMatrix(true, false);
-      for (const index of this.#selectedVertexIndices(object))
-        points.push(
-          new Vector3()
-            .fromArray(object.mesh.positions, index * 3)
-            .applyMatrix4(mesh.matrixWorld),
-        );
-    }
-    if (!points.length) return undefined;
-    return points
-      .reduce((sum, point) => sum.add(point), new Vector3())
-      .multiplyScalar(1 / points.length);
-  }
-
-  #selectedVertexIndices(object: ModelObjectSnapshot): Set<number> {
-    const result = new Set<number>();
-    const selected = new Set(
-      this.#selectionItems
-        .filter((item) => item.objectId === object.id)
-        .map((item) => item.elementId),
-    );
-    object.mesh.vertexIds.forEach((id, index) => {
-      if (selected.has(id)) result.add(index);
-    });
-    object.mesh.edges.forEach((edge) => {
-      if (!selected.has(edge.id)) return;
-      result.add(edge.vertices[0]);
-      result.add(edge.vertices[1]);
-    });
-    object.mesh.faceIds.forEach((id, index) => {
-      if (!selected.has(id)) return;
-      object.mesh.faces[index]?.forEach((vertex) => result.add(vertex));
-    });
-    return result;
   }
 
   #readTransform(mesh: import("three").Mesh): TransformValue {
