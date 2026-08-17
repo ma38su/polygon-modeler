@@ -10,7 +10,9 @@
 ## 主な編集機能
 
 - Vertex / Edge / Faceの独立した選択・表示、移動・回転・拡大縮小
-- Extrude、Inset、Bevel、Loop Cut、法線方向移動
+- Extrude、Inset、Bevel、位置指定Loop Cut、Knife、法線方向移動
+- World／Local／Normal軸Transform、Edge Loop／Ring選択
+- メッシュ診断、面法線表示、Merge by Distance、法線再計算
 - Duplicate、Delete、Separate、Join、Mirror
 - 閉じた立体同士のBoolean（Union / Subtract / Intersect）
 - Undo / Redo、ローカル自動保存、GLB / STL入出力

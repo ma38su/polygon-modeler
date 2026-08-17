@@ -6,6 +6,11 @@ import babel from "@rolldown/plugin-babel";
 export default defineConfig({
   base: process.env.VITE_BASE_PATH ?? "/",
   plugins: [react(), babel({ presets: [reactCompilerPreset()] })],
+  // @ts-expect-error Vitest extends Vite's config at runtime.
+  test: {
+    // Performance budgets must not compete with parallel JSDOM/Three.js suites.
+    fileParallelism: false,
+  },
   build: {
     rolldownOptions: {
       output: {
