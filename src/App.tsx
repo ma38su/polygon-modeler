@@ -2,12 +2,9 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import {
   AlertCircle,
   Box,
-  BoxIcon,
   ChevronDown,
   CircleGauge,
   Expand,
-  Eye,
-  EyeOff,
   FileDown,
   FolderOpen,
   HelpCircle,
@@ -31,8 +28,8 @@ import {
 } from "./viewport/displayLayers";
 import { useEditor, useEditorSnapshot } from "./app/useEditor";
 import { useEditorShortcuts } from "./app/shortcuts/useEditorShortcuts";
-import { TransformInspector } from "./ui/inspector/TransformInspector";
-import { ElementTransformPanel } from "./ui/inspector/ElementTransformPanel";
+import { ViewportControls } from "./ui/viewport/ViewportControls";
+import { ScenePanel } from "./ui/scene/ScenePanel";
 import { useProjectPersistence } from "./app/useProjectPersistence";
 import { useExchangeFiles } from "./app/useExchangeFiles";
 import "./App.css";
@@ -48,9 +45,6 @@ const labels: Record<Capability, string> = {
 export default function App() {
   const editor = useEditor();
   const snapshot = useEditorSnapshot();
-  const selectedObject = snapshot.objects.find((object) =>
-    snapshot.selectedObjectIds.has(object.id),
-  );
   const [capability, setCapability] = useState<Capability>("checking");
   const [projection, setProjection] = useState<"perspective" | "orthographic">(
     "perspective",
@@ -110,6 +104,12 @@ export default function App() {
       editor.selectElement(item, additive),
     [editor],
   );
+  const toggleDisplayLayer = useCallback((layer: keyof DisplayLayers) => {
+    setDisplayLayers((current) => ({
+      ...current,
+      [layer]: !current[layer],
+    }));
+  }, []);
 
   return (
     <main className="editor-shell">
@@ -262,78 +262,14 @@ export default function App() {
             setContextMenu({ x: event.clientX, y: event.clientY });
           }}
         >
-          <div className="selection-mode-bar" aria-label="選択モード">
-            {(
-              [
-                ["vertex", "Vertex", "頂点を選択（Shiftで複数選択）"],
-                ["edge", "Edge", "辺を選択（Shiftで複数選択）"],
-                ["face", "Face", "面を選択（Shiftで複数選択）"],
-              ] as const
-            ).map(([mode, label, description]) => (
-              <button
-                type="button"
-                key={mode}
-                className={snapshot.selectionModes.has(mode) ? "active" : ""}
-                aria-pressed={snapshot.selectionModes.has(mode)}
-                title={description}
-                onClick={() => editor.toggleSelectionMode(mode)}
-              >
-                {label}
-              </button>
-            ))}
-          </div>
-          <div className="selection-mode-hint" aria-live="polite">
-            Vertex → Edge → Faceの順に判定 / Shiftで追加選択
-          </div>
-          <div className="display-layer-bar" aria-label="表示レイヤー">
-            <span>表示</span>
-            {(
-              [
-                ["vertices", "Vertex", "頂点"],
-                ["edges", "Edge", "辺"],
-                ["faces", "Face", "面"],
-              ] as const
-            ).map(([layer, label, japaneseLabel]) => {
-              const visible = displayLayers[layer];
-              const VisibilityIcon = visible ? Eye : EyeOff;
-              return (
-                <button
-                  type="button"
-                  key={layer}
-                  className={visible ? "active" : ""}
-                  aria-pressed={visible}
-                  title={`${japaneseLabel}を${visible ? "非表示" : "表示"}`}
-                  onClick={() =>
-                    setDisplayLayers((current) => ({
-                      ...current,
-                      [layer]: !current[layer],
-                    }))
-                  }
-                >
-                  <VisibilityIcon aria-hidden="true" />
-                  {label}
-                </button>
-              );
-            })}
-          </div>
-          <div className="viewport-toolbar" aria-label="ビューポート設定">
-            <button
-              type="button"
-              className={projection === "perspective" ? "active" : ""}
-              onClick={() => setProjection("perspective")}
-            >
-              <BoxIcon aria-hidden="true" />
-              透視
-            </button>
-            <button
-              type="button"
-              className={projection === "orthographic" ? "active" : ""}
-              onClick={() => setProjection("orthographic")}
-            >
-              <Box aria-hidden="true" />
-              正投影
-            </button>
-          </div>
+          <ViewportControls
+            selectionModes={snapshot.selectionModes}
+            onToggleSelectionMode={(mode) => editor.toggleSelectionMode(mode)}
+            displayLayers={displayLayers}
+            onToggleDisplayLayer={toggleDisplayLayer}
+            projection={projection}
+            onProjectionChange={setProjection}
+          />
           <ViewportCanvas
             projection={projection}
             onStatusChange={handleViewportStatus}
@@ -342,7 +278,6 @@ export default function App() {
             transformMode={transformMode}
             onTransformCommit={handleTransformCommit}
             onElementTranslateCommit={handleElementTranslateCommit}
-            selectionMode={snapshot.selectionMode}
             selectionModes={snapshot.selectionModes}
             selectionItems={snapshot.selectionItems}
             displayLayers={displayLayers}
@@ -410,66 +345,11 @@ export default function App() {
           )}
         </section>
 
-        <aside className="side-panel">
-          <section aria-labelledby="outliner-title">
-            <h2 id="outliner-title">オブジェクト</h2>
-            {snapshot.objects.length === 0 ? (
-              <div className="empty-state">
-                <Box aria-hidden="true" />
-                シーンは空です
-              </div>
-            ) : (
-              <ul className="object-list">
-                {snapshot.objects.map((object) => (
-                  <li
-                    className={
-                      snapshot.selectedObjectIds.has(object.id)
-                        ? "selected"
-                        : ""
-                    }
-                    key={object.id}
-                  >
-                    <button
-                      type="button"
-                      className="object-select"
-                      onClick={() => editor.selectObject(object.id)}
-                    >
-                      <Box aria-hidden="true" />
-                      {object.name}
-                    </button>
-                    <button
-                      type="button"
-                      className="visibility-toggle"
-                      aria-label={`${object.name}を${object.visible ? "非表示" : "表示"}`}
-                      onClick={() =>
-                        editor.setObjectVisible(object.id, !object.visible)
-                      }
-                    >
-                      {object.visible ? (
-                        <Eye aria-hidden="true" />
-                      ) : (
-                        <EyeOff aria-hidden="true" />
-                      )}
-                    </button>
-                  </li>
-                ))}
-              </ul>
-            )}
-          </section>
-          <section aria-labelledby="inspector-title">
-            <h2 id="inspector-title">インスペクター</h2>
-            {snapshot.selectionItems.length ? (
-              <ElementTransformPanel
-                editor={editor}
-                onError={setErrorMessage}
-              />
-            ) : selectedObject ? (
-              <TransformInspector editor={editor} object={selectedObject} />
-            ) : (
-              <div className="empty-state">オブジェクトを選択してください</div>
-            )}
-          </section>
-        </aside>
+        <ScenePanel
+          editor={editor}
+          snapshot={snapshot}
+          onError={setErrorMessage}
+        />
       </div>
 
       <footer className="status-bar">

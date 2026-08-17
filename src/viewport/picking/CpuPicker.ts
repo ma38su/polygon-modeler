@@ -4,6 +4,7 @@ import type {
   SelectionItem,
   SelectionMode,
 } from "../../editor/selection/SelectionManager";
+import { SELECTION_MODES } from "../../editor/selection/SelectionManager";
 import type { RenderGeometryAdapter } from "../adapters/RenderGeometryAdapter";
 
 export class CpuPicker {
@@ -18,7 +19,7 @@ export class CpuPicker {
     objects: readonly ModelObjectSnapshot[],
     modes: ReadonlySet<SelectionMode>,
   ): SelectionItem | undefined {
-    for (const mode of ["vertex", "edge", "face"] as const) {
+    for (const mode of SELECTION_MODES) {
       if (!modes.has(mode)) continue;
       const item = this.pick(x, y, bounds, camera, adapter, objects, mode);
       if (item) return item;

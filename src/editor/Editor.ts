@@ -536,7 +536,6 @@ export class Editor {
       revision: this.#revision,
       canUndo: this.history.canUndo,
       canRedo: this.history.canRedo,
-      selectionMode: this.selection.mode,
       selectionModes: this.selection.modes,
       selectionItems: this.selection.items,
       isDirty: this.#isDirty,

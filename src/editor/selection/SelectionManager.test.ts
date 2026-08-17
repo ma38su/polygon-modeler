@@ -50,7 +50,7 @@ describe("SelectionManager", () => {
     const snapshot = selection.snapshot();
     selection.setMode("face");
     selection.restore(snapshot);
-    expect(selection.mode).toBe("vertex");
+    expect(selection.modes).toEqual(new Set(["vertex"]));
     expect(selection.items).toEqual([vertex("v-1"), vertex("v-2")]);
   });
 });

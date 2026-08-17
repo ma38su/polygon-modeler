@@ -29,6 +29,7 @@ import type {
   SelectionItem,
   SelectionMode,
 } from "../editor/selection/SelectionManager";
+import { SELECTION_MODES } from "../editor/selection/SelectionManager";
 import type { DisplayLayers } from "./displayLayers";
 import {
   canUseWebGpu,
@@ -81,11 +82,7 @@ export class Viewport {
   #selectedObjectId?: ObjectId;
   #transformBefore?: TransformValue;
   #objects: readonly ModelObjectSnapshot[] = [];
-  #selectionModes: ReadonlySet<SelectionMode> = new Set([
-    "vertex",
-    "edge",
-    "face",
-  ]);
+  #selectionModes: ReadonlySet<SelectionMode> = new Set(SELECTION_MODES);
   #selectionItems: readonly SelectionItem[] = [];
   readonly #elementPreview = new Map<
     ObjectId,

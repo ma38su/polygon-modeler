@@ -57,8 +57,8 @@ test("shows the empty editor shell", async ({ page }) => {
     "false",
   );
   await expect(page.getByTestId("viewport-canvas")).toHaveAttribute(
-    "data-selection-mode",
-    "vertex",
+    "data-selection-modes",
+    "vertex,edge,face",
   );
   await displayLayers.getByRole("button", { name: "Vertex" }).click();
   await displayLayers.getByRole("button", { name: "Face" }).click();
@@ -78,7 +78,7 @@ test("shows the empty editor shell", async ({ page }) => {
   await selectionModes.getByRole("button", { name: "Edge" }).click();
   await selectionModes.getByRole("button", { name: "Face" }).click();
   await expect(page.getByTestId("viewport-canvas")).toHaveAttribute(
-    "data-selection-mode",
+    "data-selection-modes",
     "vertex",
   );
   await expect(

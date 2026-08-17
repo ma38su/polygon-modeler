@@ -1,5 +1,6 @@
 import { useEffect } from "react";
 import type { Editor } from "../../editor/Editor";
+import { SELECTION_MODES } from "../../editor/selection/SelectionManager";
 import type { TransformMode } from "../../viewport/Viewport";
 
 interface ShortcutOptions {
@@ -28,13 +29,8 @@ export function useEditorShortcuts(
         event.preventDefault();
         editor.clearSelection();
       } else if (["1", "2", "3"].includes(event.key)) {
-        const modes = {
-          "1": "vertex",
-          "2": "edge",
-          "3": "face",
-        } as const;
-        const mode = modes[event.key as keyof typeof modes];
-        editor.toggleSelectionMode(mode);
+        const mode = SELECTION_MODES[Number(event.key) - 1];
+        if (mode) editor.toggleSelectionMode(mode);
       } else if (event.key.toLowerCase() === "g") {
         setTransformMode("translate");
       } else if (event.key.toLowerCase() === "r") {

@@ -23,7 +23,6 @@ export interface ViewportCanvasProps {
   onElementTranslateCommit(
     delta: import("../editor/document/types").Vector3Value,
   ): void;
-  selectionMode: SelectionMode;
   selectionModes: ReadonlySet<SelectionMode>;
   selectionItems: readonly SelectionItem[];
   displayLayers: DisplayLayers;
@@ -38,7 +37,6 @@ export function ViewportCanvas({
   transformMode,
   onTransformCommit,
   onElementTranslateCommit,
-  selectionMode,
   selectionModes,
   selectionItems,
   displayLayers,
@@ -75,14 +73,7 @@ export function ViewportCanvas({
         selectionItems,
         displayLayers,
       ),
-    [
-      displayLayers,
-      objects,
-      selectedObjectIds,
-      selectionItems,
-      selectionMode,
-      selectionModes,
-    ],
+    [displayLayers, objects, selectedObjectIds, selectionItems, selectionModes],
   );
   useEffect(
     () => viewportRef.current?.setPicking(selectionModes, onPick),
@@ -98,7 +89,6 @@ export function ViewportCanvas({
       className="viewport-canvas"
       ref={hostRef}
       data-testid="viewport-canvas"
-      data-selection-mode={selectionMode}
       data-selection-modes={[...selectionModes].join(",")}
       data-display-vertices={displayLayers.vertices}
       data-display-edges={displayLayers.edges}
