@@ -1,4 +1,16 @@
-import { Box, Combine, Copy, Eye, EyeOff, FlipHorizontal2 } from "lucide-react";
+import { useState } from "react";
+import {
+  Blend,
+  Box,
+  Combine,
+  Copy,
+  Eye,
+  EyeOff,
+  FlipHorizontal2,
+  GitMerge,
+  Minus,
+} from "lucide-react";
+import type { BooleanOperation } from "../../editor/boolean/booleanOperations";
 import type { Editor } from "../../editor/Editor";
 import type { EditorSnapshot } from "../../editor/document/types";
 import { ElementTransformPanel } from "../inspector/ElementTransformPanel";
@@ -17,9 +29,20 @@ export function ScenePanel({
   onError,
   onModelingPreview,
 }: ScenePanelProps) {
+  const [booleanPending, setBooleanPending] = useState(false);
   const selectedObject = snapshot.objects.find((object) =>
     snapshot.selectedObjectIds.has(object.id),
   );
+  const runBoolean = async (operation: BooleanOperation) => {
+    setBooleanPending(true);
+    try {
+      await editor.booleanSelectedObjects(operation);
+    } catch (error) {
+      onError(error instanceof Error ? error.message : String(error));
+    } finally {
+      setBooleanPending(false);
+    }
+  };
 
   return (
     <aside className="side-panel">
@@ -93,6 +116,23 @@ export function ScenePanel({
             >
               <FlipHorizontal2 aria-hidden="true" />
               Mirror {axis.toUpperCase()}
+            </button>
+          ))}
+          {(
+            [
+              ["union", "Union", GitMerge],
+              ["subtract", "Subtract", Minus],
+              ["intersect", "Intersect", Blend],
+            ] as const
+          ).map(([operation, label, Icon]) => (
+            <button
+              type="button"
+              key={operation}
+              disabled={booleanPending || snapshot.selectedObjectIds.size !== 2}
+              onClick={() => void runBoolean(operation)}
+            >
+              <Icon aria-hidden="true" />
+              {booleanPending ? "演算中…" : label}
             </button>
           ))}
         </div>

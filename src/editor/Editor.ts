@@ -54,6 +54,10 @@ import {
   mirrorMesh,
 } from "./mesh/objectOperations";
 import { moveElementsAlongNormals } from "./mesh/normalMovement";
+import {
+  evaluateBoolean,
+  type BooleanOperation,
+} from "./boolean/booleanOperations";
 type Listener = () => void;
 export class Editor {
   readonly document = new ModelDocument();
@@ -214,6 +218,47 @@ export class Editor {
     );
     this.#selectedObjectIds.clear();
     this.#selectedObjectIds.add(joined.id);
+    this.#commit(true);
+  }
+  async booleanSelectedObjects(operation: BooleanOperation): Promise<void> {
+    const sources = this.document
+      .objects()
+      .filter((object) => this.#selectedObjectIds.has(object.id));
+    if (sources.length !== 2)
+      throw new Error("Boolean演算には2つのオブジェクトを選択してください");
+    const sourceIds = sources.map((source) => source.id);
+    const sourceRevision = this.#revision;
+    const resultMesh = await evaluateBoolean(
+      sources[0]!.toSnapshot(),
+      sources[1]!.toSnapshot(),
+      operation,
+    );
+    if (
+      sourceRevision !== this.#revision ||
+      sourceIds.some((id) => !this.document.getObject(id))
+    )
+      throw new Error("演算中に対象オブジェクトが変更されました");
+    const sequence = this.#nextObjectId++;
+    const labels = {
+      union: "Union",
+      subtract: "Subtract",
+      intersect: "Intersect",
+    };
+    const result = new ModelObject(
+      `object-${sequence}` as ObjectId,
+      `${labels[operation]} ${sequence}`,
+      resultMesh,
+    );
+    this.history.execute(
+      new CompositeCommand(`Boolean ${labels[operation]}`, [
+        new DeleteObjectCommand(sourceIds),
+        new CreateObjectCommand(result),
+      ]),
+      this.document,
+    );
+    this.selection.clear();
+    this.#selectedObjectIds.clear();
+    this.#selectedObjectIds.add(result.id);
     this.#commit(true);
   }
   separateSelectedFaces(): void {

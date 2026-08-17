@@ -262,6 +262,38 @@ describe("Editor", () => {
     expect(editor.getSnapshot().objects).toEqual(before.objects);
     expect(editor.getSnapshot().canUndo).toBe(before.canUndo);
   });
+  it("applies an undoable Boolean union to two selected solids", async () => {
+    const editor = new Editor();
+    const leftId = editor.createBox();
+    const rightId = editor.createBox();
+    editor.transformObject(rightId, {
+      position: { x: 0.75, y: 0, z: 0 },
+      rotation: { x: 0, y: 0, z: 0 },
+      scale: { x: 1, y: 1, z: 1 },
+    });
+    editor.selectObject(leftId);
+    editor.selectObject(rightId, true);
+
+    await editor.booleanSelectedObjects("union");
+
+    expect(editor.getSnapshot().objects).toHaveLength(1);
+    expect(editor.getSnapshot().objects[0]!.name).toContain("Union");
+    expect(editor.getSnapshot().objects[0]!.mesh.faces.length).toBeGreaterThan(
+      6,
+    );
+    editor.undo();
+    expect(editor.getSnapshot().objects).toHaveLength(2);
+  });
+  it("rejects Boolean operations on an open mesh", async () => {
+    const editor = new Editor();
+    const planeId = editor.createPlane();
+    const boxId = editor.createBox();
+    editor.selectObject(planeId);
+    editor.selectObject(boxId, true);
+    await expect(editor.booleanSelectedObjects("union")).rejects.toThrow(
+      "閉じた立体",
+    );
+  });
   it("converts gizmo movement from world space into object-local space", () => {
     const editor = new Editor();
     const objectId = editor.createBox();

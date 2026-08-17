@@ -273,6 +273,30 @@ test("duplicates and joins objects from the outliner", async ({ page }) => {
   ).toBeVisible();
 });
 
+test("unions two closed objects and restores them with undo", async ({
+  page,
+}) => {
+  await page.goto("/?renderer=webgl2");
+  await page.getByRole("button", { name: "Box追加" }).click();
+  await page.getByRole("button", { name: "Cylinder追加" }).click();
+  await page
+    .getByRole("button", { name: "Box 1", exact: true })
+    .click({ modifiers: ["Shift"] });
+  await expect(page.getByRole("button", { name: "Union" })).toBeEnabled();
+  await page.getByRole("button", { name: "Union" }).click();
+  await expect(page.getByRole("button", { name: /^Union \d+$/ })).toBeVisible();
+  await expect(
+    page.getByRole("button", { name: "Box 1", exact: true }),
+  ).toHaveCount(0);
+  await page.getByRole("button", { name: "元に戻す" }).click();
+  await expect(
+    page.getByRole("button", { name: "Box 1", exact: true }),
+  ).toBeVisible();
+  await expect(
+    page.getByRole("button", { name: "Cylinder 2", exact: true }),
+  ).toBeVisible();
+});
+
 test("selects vertices with box and lasso gestures", async ({ page }) => {
   await page.goto("/?renderer=webgl2");
   await page.getByRole("button", { name: "Box追加" }).click();
