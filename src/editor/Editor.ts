@@ -32,6 +32,7 @@ import type { EditorCommand } from "./commands/EditorCommand";
 import type { SelectionSnapshot } from "./selection/SelectionManager";
 import {
   createFace,
+  bevelElements,
   extrudeFaces,
   insetFaces,
   flipFaces,
@@ -399,6 +400,42 @@ export class Editor {
           items
             .map((item) => item.elementId as FaceId)
             .filter((id) => mesh.faces.has(id)),
+        ),
+        amount,
+      ),
+    );
+  }
+  bevelSelectedElements(amount: number): void {
+    this.#applyTopology("要素をベベル", (mesh, items) =>
+      bevelElements(
+        mesh,
+        new Set(
+          items
+            .map((item) => item.elementId as VertexId)
+            .filter((id) => mesh.vertices.has(id)),
+        ),
+        new Set(
+          items
+            .map((item) => item.elementId as EdgeId)
+            .filter((id) => mesh.edges.has(id)),
+        ),
+        amount,
+      ),
+    );
+  }
+  previewBevelSelectedElements(amount: number): readonly ModelObjectSnapshot[] {
+    return this.#previewTopology((mesh, items) =>
+      bevelElements(
+        mesh,
+        new Set(
+          items
+            .map((item) => item.elementId as VertexId)
+            .filter((id) => mesh.vertices.has(id)),
+        ),
+        new Set(
+          items
+            .map((item) => item.elementId as EdgeId)
+            .filter((id) => mesh.edges.has(id)),
         ),
         amount,
       ),

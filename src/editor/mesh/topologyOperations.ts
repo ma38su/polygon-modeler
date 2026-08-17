@@ -142,6 +142,77 @@ export function insetFaces(
   );
 }
 
+export function bevelElements(
+  mesh: EditableMesh,
+  vertexIds: ReadonlySet<VertexId>,
+  edgeIds: ReadonlySet<EdgeId>,
+  amount: number,
+): EditableMesh {
+  if (!Number.isFinite(amount) || amount <= 0 || amount >= 0.5)
+    throw new Error("ベベル率は0より大きく0.5未満で指定してください。");
+  const selected = new Set(vertexIds);
+  for (const edgeId of edgeIds) {
+    const edge = mesh.edges.get(edgeId);
+    const halfEdge = edge && mesh.halfEdges.get(edge.halfEdges[0]!);
+    if (halfEdge) {
+      selected.add(halfEdge.origin);
+      selected.add(halfEdge.destination);
+    }
+  }
+  if (!selected.size) return mesh.clone();
+
+  const data = mesh.toMeshData();
+  const indexById = new Map(data.vertexIds.map((id, index) => [id, index]));
+  const positions = [...data.positions];
+  const cutIndices = new Map<string, number>();
+  const cut = (origin: VertexId, neighbor: VertexId) => {
+    const key = `${origin}:${neighbor}`;
+    const existing = cutIndices.get(key);
+    if (existing !== undefined) return existing;
+    const a = mesh.vertices.get(origin)!.position;
+    const b = mesh.vertices.get(neighbor)!.position;
+    const index = positions.length / 3;
+    positions.push(
+      a.x + (b.x - a.x) * amount,
+      a.y + (b.y - a.y) * amount,
+      a.z + (b.z - a.z) * amount,
+    );
+    cutIndices.set(key, index);
+    return index;
+  };
+
+  const caps = new Map<VertexId, VertexId[]>();
+  const polygons = [...mesh.faces.values()].map((face) => {
+    const polygon: number[] = [];
+    face.vertices.forEach((vertex, cursor) => {
+      if (!selected.has(vertex)) {
+        polygon.push(indexById.get(vertex)!);
+        return;
+      }
+      const previous = face.vertices.at(cursor - 1)!;
+      const next = face.vertices[(cursor + 1) % face.vertices.length]!;
+      polygon.push(cut(vertex, previous), cut(vertex, next));
+      const order = caps.get(vertex) ?? [];
+      if (!order.includes(previous)) order.push(previous);
+      if (!order.includes(next)) order.push(next);
+      caps.set(vertex, order);
+    });
+    return polygon;
+  });
+  for (const [vertex, neighbors] of caps) {
+    if (neighbors.length >= 3)
+      polygons.push(
+        neighbors.map((neighbor) => cut(vertex, neighbor)).reverse(),
+      );
+  }
+  return EditableMesh.fromPolygons(
+    Array.from({ length: positions.length / 3 }, (_, index) =>
+      vector(positions, index),
+    ),
+    polygons,
+  );
+}
+
 export function splitFace(mesh: EditableMesh, faceId: FaceId): EditableMesh {
   const data = mesh.toMeshData();
   const faceIndex = data.faceIds.indexOf(faceId);

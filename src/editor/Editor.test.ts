@@ -173,6 +173,30 @@ describe("Editor", () => {
     editor.undo();
     expect(editor.getSnapshot().objects[0]!.mesh.faces).toHaveLength(1);
   });
+  it("previews and commits a vertex bevel without mutating the preview source", () => {
+    const editor = new Editor();
+    const objectId = editor.createBox();
+    editor.setSelectionMode("vertex");
+    const vertexId = editor.getSnapshot().objects[0]!.mesh.vertexIds[0]!;
+    editor.selectElement({ objectId, elementId: vertexId });
+    const originalVertices =
+      editor.getSnapshot().objects[0]!.mesh.vertexIds.length;
+
+    expect(
+      editor.previewBevelSelectedElements(0.2)[0]!.mesh.vertexIds.length,
+    ).toBeGreaterThan(originalVertices);
+    expect(editor.getSnapshot().objects[0]!.mesh.vertexIds).toHaveLength(
+      originalVertices,
+    );
+    editor.bevelSelectedElements(0.2);
+    expect(
+      editor.getSnapshot().objects[0]!.mesh.vertexIds.length,
+    ).toBeGreaterThan(originalVertices);
+    editor.undo();
+    expect(editor.getSnapshot().objects[0]!.mesh.vertexIds).toHaveLength(
+      originalVertices,
+    );
+  });
   it("converts gizmo movement from world space into object-local space", () => {
     const editor = new Editor();
     const objectId = editor.createBox();

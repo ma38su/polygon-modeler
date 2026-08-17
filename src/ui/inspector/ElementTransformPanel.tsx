@@ -7,10 +7,11 @@ import {
   Layers3,
   Shrink,
   Scissors,
+  Slice,
   SquareDashed,
 } from "lucide-react";
 type Values = { x: number; y: number; z: number };
-type ModelingOperation = "extrude" | "inset";
+type ModelingOperation = "extrude" | "inset" | "bevel";
 type ModelingOperationConfig = {
   title: string;
   description: string;
@@ -40,6 +41,16 @@ const modelingOperations: Record<ModelingOperation, ModelingOperationConfig> = {
     step: 0.05,
     min: 0,
     max: 0.95,
+  },
+  bevel: {
+    title: "要素をベベル",
+    description: "選択中の頂点、または辺の両端の角を落とします。",
+    label: "ベベル率",
+    confirm: "ベベル",
+    defaultValue: 0.15,
+    step: 0.05,
+    min: 0.01,
+    max: 0.49,
   },
 };
 export function ElementTransformPanel({
@@ -73,7 +84,9 @@ export function ElementTransformPanel({
       onPreview(
         operation === "extrude"
           ? editor.previewExtrudeSelectedFaces(value)
-          : editor.previewInsetSelectedFaces(value),
+          : operation === "inset"
+            ? editor.previewInsetSelectedFaces(value)
+            : editor.previewBevelSelectedElements(value),
       );
     } catch (error) {
       onPreview(undefined);
@@ -92,7 +105,9 @@ export function ElementTransformPanel({
     try {
       if (modelingOperation === "extrude")
         editor.extrudeSelectedFaces(modelingValue);
-      else editor.insetSelectedFaces(modelingValue);
+      else if (modelingOperation === "inset")
+        editor.insetSelectedFaces(modelingValue);
+      else editor.bevelSelectedElements(modelingValue);
       closeModelingDialog();
     } catch (error) {
       onError(error instanceof Error ? error.message : String(error));
@@ -160,6 +175,10 @@ export function ElementTransformPanel({
         <button type="button" onClick={() => openModelingDialog("inset")}>
           <Shrink aria-hidden="true" />
           インセット
+        </button>
+        <button type="button" onClick={() => openModelingDialog("bevel")}>
+          <Slice aria-hidden="true" />
+          ベベル
         </button>
         <button
           type="button"

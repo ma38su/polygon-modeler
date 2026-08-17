@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import { createBoxMesh } from "./primitives/box";
 import { createPlaneMesh } from "./primitives/plane";
 import {
+  bevelElements,
   extrudeFaces,
   flipFaces,
   insetFaces,
@@ -40,6 +41,25 @@ describe("topology operations", () => {
     expect(result.vertices.size).toBe(8);
     expect(result.faces.size).toBe(5);
     expect(validateMesh(result).valid).toBe(true);
+  });
+  it("bevels a box vertex and an edge without corrupting topology", () => {
+    const mesh = createBoxMesh();
+    const vertex = [...mesh.vertices.keys()][0]!;
+    const beveledVertex = bevelElements(
+      mesh,
+      new Set([vertex]),
+      new Set(),
+      0.2,
+    );
+    expect(beveledVertex.vertices.size).toBeGreaterThan(mesh.vertices.size);
+    expect(validateMesh(beveledVertex).valid).toBe(true);
+
+    const edge = [...mesh.edges.keys()][0]!;
+    const beveledEdge = bevelElements(mesh, new Set(), new Set([edge]), 0.2);
+    expect(beveledEdge.vertices.size).toBeGreaterThan(
+      beveledVertex.vertices.size,
+    );
+    expect(validateMesh(beveledEdge).valid).toBe(true);
   });
   it("splits a face into triangles", () => {
     const mesh = createPlaneMesh();
