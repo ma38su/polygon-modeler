@@ -37,7 +37,7 @@ import type {
 } from "../editor/selection/SelectionManager";
 import { SELECTION_MODES } from "../editor/selection/SelectionManager";
 import type { DisplayLayers } from "./displayLayers";
-import { findVertexSnap } from "./snapping";
+import { findScreenSnap } from "./snapping";
 import {
   canUseWebGpu,
   getRendererPreference,
@@ -59,6 +59,8 @@ export type AxisConstraint = "all" | "x" | "y" | "z";
 export interface SnapSettings {
   readonly grid: boolean;
   readonly vertex: boolean;
+  readonly edge: boolean;
+  readonly face: boolean;
   readonly gridSize: number;
 }
 export type TransformCommitListener = (
@@ -102,7 +104,13 @@ export class Viewport {
   #transformControls?: TransformControls;
   #transformMode: TransformMode = "translate";
   #axisConstraint: AxisConstraint = "all";
-  #snapSettings: SnapSettings = { grid: false, vertex: false, gridSize: 0.5 };
+  #snapSettings: SnapSettings = {
+    grid: false,
+    vertex: false,
+    edge: false,
+    face: false,
+    gridSize: 0.5,
+  };
   #transformInteractionBlocked = false;
   #transformCommitListener?: TransformCommitListener;
   #elementTransformCommitListener?: ElementTransformCommitListener;
@@ -478,8 +486,13 @@ export class Viewport {
       this.#elementPreview.size === 0
     )
       return;
-    if (this.#transformMode === "translate" && this.#snapSettings.vertex)
-      this.#snapElementPivotToVertex();
+    if (
+      this.#transformMode === "translate" &&
+      (this.#snapSettings.vertex ||
+        this.#snapSettings.edge ||
+        this.#snapSettings.face)
+    )
+      this.#snapElementPivot();
     const worldTransform = this.#elementWorldTransform();
     for (const object of this.#objects) {
       const preview = this.#elementPreview.get(object.id);
@@ -530,7 +543,7 @@ export class Viewport {
     return this.#elementPivot.matrix.clone().multiply(initial.invert());
   }
 
-  #snapElementPivotToVertex(): void {
+  #snapElementPivot(): void {
     const selectedByObject = new Map<ObjectId, Set<number>>();
     for (const object of this.#objects)
       selectedByObject.set(object.id, this.#selectedVertexIndices(object));
@@ -540,19 +553,41 @@ export class Viewport {
       if (!mesh || !object.visible) continue;
       mesh.updateWorldMatrix(true, false);
       const selected = selectedByObject.get(object.id)!;
-      object.mesh.vertexIds.forEach((_, index) => {
-        if (selected.has(index)) return;
-        const point = new Vector3()
+      const point = (index: number) =>
+        new Vector3()
           .fromArray(object.mesh.positions, index * 3)
           .applyMatrix4(mesh.matrixWorld);
-        candidates.push(point);
-      });
+      if (this.#snapSettings.vertex)
+        object.mesh.vertexIds.forEach((_, index) => {
+          if (!selected.has(index)) candidates.push(point(index));
+        });
+      if (this.#snapSettings.edge)
+        object.mesh.edges.forEach((edge) => {
+          if (selected.has(edge.vertices[0]) || selected.has(edge.vertices[1]))
+            return;
+          candidates.push(
+            point(edge.vertices[0])
+              .add(point(edge.vertices[1]))
+              .multiplyScalar(0.5),
+          );
+        });
+      if (this.#snapSettings.face)
+        object.mesh.faces.forEach((face) => {
+          if (face.some((index) => selected.has(index))) return;
+          const center = face
+            .reduce((sum, index) => sum.add(point(index)), new Vector3())
+            .multiplyScalar(1 / face.length);
+          candidates.push(center);
+        });
     }
-    const snapped = findVertexSnap(
+    const bounds = this.element.getBoundingClientRect();
+    const snapped = findScreenSnap(
       this.#elementPivot.position,
       candidates,
+      (point) => point.project(this.#camera),
+      bounds,
       this.#axisConstraint,
-      0.3,
+      12,
     );
     if (snapped) this.#elementPivot.position.copy(snapped);
   }

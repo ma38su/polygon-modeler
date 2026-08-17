@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { Vector3 } from "three";
-import { findVertexSnap } from "./snapping";
+import { findScreenSnap, findVertexSnap } from "./snapping";
 
 describe("findVertexSnap", () => {
   it("snaps every coordinate to the nearest vertex", () => {
@@ -23,5 +23,23 @@ describe("findVertexSnap", () => {
         0.3,
       )?.toArray(),
     ).toEqual([1.1, 5, 8]);
+  });
+});
+
+describe("findScreenSnap", () => {
+  it("uses a stable pixel threshold instead of world distance", () => {
+    const candidate = new Vector3(100, 100, 100);
+    const project = (point: Vector3) =>
+      point === candidate ? new Vector3(0.01, 0, 0) : new Vector3(0, 0, 0);
+    expect(
+      findScreenSnap(
+        new Vector3(),
+        [candidate],
+        project,
+        { width: 1000, height: 500 },
+        "all",
+        6,
+      )?.toArray(),
+    ).toEqual([100, 100, 100]);
   });
 });

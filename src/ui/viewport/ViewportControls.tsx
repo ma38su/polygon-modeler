@@ -1,4 +1,13 @@
-import { Box, BoxIcon, Eye, EyeOff, Grid3X3, Magnet } from "lucide-react";
+import {
+  Box,
+  BoxIcon,
+  Eye,
+  EyeOff,
+  Grid3X3,
+  Magnet,
+  Minus,
+  Square,
+} from "lucide-react";
 import {
   SELECTION_MODES,
   type SelectionMode,
@@ -136,6 +145,36 @@ export function ViewportControls({
         >
           <Magnet aria-hidden="true" />
           Vertex
+        </button>
+        <button
+          type="button"
+          className={snapSettings.edge ? "active" : ""}
+          aria-pressed={snapSettings.edge}
+          title="未選択の辺の中点へスナップ"
+          onClick={() =>
+            onSnapSettingsChange({
+              ...snapSettings,
+              edge: !snapSettings.edge,
+            })
+          }
+        >
+          <Minus aria-hidden="true" />
+          Edge
+        </button>
+        <button
+          type="button"
+          className={snapSettings.face ? "active" : ""}
+          aria-pressed={snapSettings.face}
+          title="未選択の面の中心へスナップ"
+          onClick={() =>
+            onSnapSettingsChange({
+              ...snapSettings,
+              face: !snapSettings.face,
+            })
+          }
+        >
+          <Square aria-hidden="true" />
+          Face
         </button>
         <span>軸</span>
         {(["x", "y", "z"] as const).map((axis) => (

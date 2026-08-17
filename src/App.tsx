@@ -65,6 +65,8 @@ export default function App() {
   const [snapSettings, setSnapSettings] = useState<SnapSettings>({
     grid: false,
     vertex: false,
+    edge: false,
+    face: false,
     gridSize: 0.5,
   });
   const [displayLayers, setDisplayLayers] = useState<DisplayLayers>({
@@ -446,7 +448,14 @@ export default function App() {
         <span>
           スナップ: {snapSettings.grid ? "Grid " : ""}
           {snapSettings.vertex ? "Vertex" : ""}
-          {!snapSettings.grid && !snapSettings.vertex ? "OFF" : ""}
+          {snapSettings.edge ? " Edge" : ""}
+          {snapSettings.face ? " Face" : ""}
+          {!snapSettings.grid &&
+          !snapSettings.vertex &&
+          !snapSettings.edge &&
+          !snapSettings.face
+            ? "OFF"
+            : ""}
         </span>
         <span>
           頂点:{" "}

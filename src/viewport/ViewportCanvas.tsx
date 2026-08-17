@@ -137,6 +137,8 @@ export function ViewportCanvas({
       data-axis-constraint={axisConstraint}
       data-grid-snap={snapSettings.grid}
       data-vertex-snap={snapSettings.vertex}
+      data-edge-snap={snapSettings.edge}
+      data-face-snap={snapSettings.face}
       data-modeling-preview={modelingPreviewActive}
       tabIndex={0}
       onPointerDown={(event) => event.currentTarget.focus()}
