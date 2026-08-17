@@ -265,7 +265,6 @@ export default function App() {
           <div className="selection-mode-bar" aria-label="選択モード">
             {(
               [
-                ["object", "Object", "オブジェクト全体を選択"],
                 ["vertex", "Vertex", "頂点を選択（Shiftで複数選択）"],
                 ["edge", "Edge", "辺を選択（Shiftで複数選択）"],
                 ["face", "Face", "面を選択（Shiftで複数選択）"],
@@ -277,20 +276,14 @@ export default function App() {
                 className={snapshot.selectionModes.has(mode) ? "active" : ""}
                 aria-pressed={snapshot.selectionModes.has(mode)}
                 title={description}
-                onClick={() =>
-                  mode === "object"
-                    ? editor.setSelectionMode(mode)
-                    : editor.toggleSelectionMode(mode)
-                }
+                onClick={() => editor.toggleSelectionMode(mode)}
               >
                 {label}
               </button>
             ))}
           </div>
           <div className="selection-mode-hint" aria-live="polite">
-            {snapshot.selectionModes.has("object")
-              ? "Object: オブジェクト全体"
-              : "Vertex → Edge → Faceの順に判定 / Shiftで追加選択"}
+            Vertex → Edge → Faceの順に判定 / Shiftで追加選択
           </div>
           <div className="display-layer-bar" aria-label="表示レイヤー">
             <span>表示</span>
@@ -465,8 +458,7 @@ export default function App() {
           </section>
           <section aria-labelledby="inspector-title">
             <h2 id="inspector-title">インスペクター</h2>
-            {!snapshot.selectionModes.has("object") &&
-            snapshot.selectionItems.length ? (
+            {snapshot.selectionItems.length ? (
               <ElementTransformPanel
                 editor={editor}
                 onError={setErrorMessage}
@@ -524,7 +516,7 @@ export default function App() {
             </header>
             <dl>
               {[
-                ["1 / 2 / 3 / 4", "Object / Vertex / Edge / Face"],
+                ["1 / 2 / 3", "Vertex / Edge / Face"],
                 ["G / R / S", "移動 / 回転 / 拡大縮小"],
                 ["⌘/Ctrl A", "すべて選択"],
                 ["Alt A", "選択解除"],

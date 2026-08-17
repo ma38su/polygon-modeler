@@ -14,18 +14,11 @@ describe("RenderGeometryAdapter selection overlays", () => {
     const adapter = new RenderGeometryAdapter();
     const object = createSnapshot();
 
-    adapter.sync(
-      [object],
-      new Set([objectId]),
-      "object",
-      new Set(["object"]),
-      [],
-      {
-        vertices: true,
-        edges: false,
-        faces: true,
-      },
-    );
+    adapter.sync([object], new Set([objectId]), [], {
+      vertices: true,
+      edges: false,
+      faces: true,
+    });
     expect(
       adapter.getOverlay(objectId)?.getObjectByName("vertex-overlay"),
     ).toBeDefined();
@@ -33,18 +26,11 @@ describe("RenderGeometryAdapter selection overlays", () => {
       adapter.getOverlay(objectId)?.getObjectByName("edge-overlay"),
     ).toBeUndefined();
 
-    adapter.sync(
-      [object],
-      new Set([objectId]),
-      "object",
-      new Set(["object"]),
-      [],
-      {
-        vertices: false,
-        edges: true,
-        faces: true,
-      },
-    );
+    adapter.sync([object], new Set([objectId]), [], {
+      vertices: false,
+      edges: true,
+      faces: true,
+    });
     expect(
       adapter.getOverlay(objectId)?.getObjectByName("edge-overlay"),
     ).toBeDefined();
@@ -53,34 +39,20 @@ describe("RenderGeometryAdapter selection overlays", () => {
       objectId,
       elementId: object.mesh.faceIds[0]!,
     };
-    adapter.sync(
-      [object],
-      new Set([objectId]),
-      "face",
-      new Set(["face"]),
-      [faceSelection],
-      {
-        vertices: false,
-        edges: false,
-        faces: true,
-      },
-    );
+    adapter.sync([object], new Set([objectId]), [faceSelection], {
+      vertices: false,
+      edges: false,
+      faces: true,
+    });
     expect(
       adapter.getOverlay(objectId)?.getObjectByName("face-selection-overlay"),
     ).toBeDefined();
 
-    adapter.sync(
-      [object],
-      new Set([objectId]),
-      "object",
-      new Set(["object"]),
-      [],
-      {
-        vertices: false,
-        edges: false,
-        faces: false,
-      },
-    );
+    adapter.sync([object], new Set([objectId]), [], {
+      vertices: false,
+      edges: false,
+      faces: false,
+    });
     expect(adapter.getOverlay(objectId)).toBeUndefined();
     const mesh = adapter.getMesh(objectId)!;
     expect(mesh.visible).toBe(true);
@@ -96,8 +68,6 @@ describe("RenderGeometryAdapter selection overlays", () => {
     adapter.sync(
       [object],
       new Set([objectId]),
-      "vertex",
-      new Set(["vertex"]),
       [{ objectId, elementId: object.mesh.vertexIds[0]! }],
       { vertices: true, edges: false, faces: true },
     );
@@ -126,18 +96,11 @@ describe("RenderGeometryAdapter selection overlays", () => {
       objectId,
       elementId,
     }));
-    adapter.sync(
-      [object],
-      new Set([objectId]),
-      "face",
-      new Set(["face"]),
-      selection,
-      {
-        vertices: false,
-        edges: false,
-        faces: true,
-      },
-    );
+    adapter.sync([object], new Set([objectId]), selection, {
+      vertices: false,
+      edges: false,
+      faces: true,
+    });
     const selectedFaces = adapter
       .getOverlay(objectId)
       ?.getObjectByName("face-selection-overlay") as import("three").Mesh;

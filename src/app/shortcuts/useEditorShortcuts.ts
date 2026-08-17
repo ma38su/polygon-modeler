@@ -27,16 +27,14 @@ export function useEditorShortcuts(
       } else if (event.altKey && event.key.toLowerCase() === "a") {
         event.preventDefault();
         editor.clearSelection();
-      } else if (["1", "2", "3", "4"].includes(event.key)) {
+      } else if (["1", "2", "3"].includes(event.key)) {
         const modes = {
-          "1": "object",
-          "2": "vertex",
-          "3": "edge",
-          "4": "face",
+          "1": "vertex",
+          "2": "edge",
+          "3": "face",
         } as const;
         const mode = modes[event.key as keyof typeof modes];
-        if (mode === "object") editor.setSelectionMode(mode);
-        else editor.toggleSelectionMode(mode);
+        editor.toggleSelectionMode(mode);
       } else if (event.key.toLowerCase() === "g") {
         setTransformMode("translate");
       } else if (event.key.toLowerCase() === "r") {

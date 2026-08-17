@@ -81,7 +81,11 @@ export class Viewport {
   #selectedObjectId?: ObjectId;
   #transformBefore?: TransformValue;
   #objects: readonly ModelObjectSnapshot[] = [];
-  #selectionModes: ReadonlySet<SelectionMode> = new Set(["object"]);
+  #selectionModes: ReadonlySet<SelectionMode> = new Set([
+    "vertex",
+    "edge",
+    "face",
+  ]);
   #selectionItems: readonly SelectionItem[] = [];
   readonly #elementPreview = new Map<
     ObjectId,
@@ -158,7 +162,6 @@ export class Viewport {
   syncObjects(
     objects: readonly ModelObjectSnapshot[],
     selectedIds: ReadonlySet<ObjectId>,
-    selectionMode: SelectionMode,
     selectionModes: ReadonlySet<SelectionMode>,
     selectionItems: readonly SelectionItem[],
     displayLayers: DisplayLayers,
@@ -166,8 +169,6 @@ export class Viewport {
     this.#geometryAdapter.sync(
       objects,
       selectedIds,
-      selectionMode,
-      selectionModes,
       selectionItems,
       displayLayers,
     );
@@ -321,12 +322,11 @@ export class Viewport {
   #attachSelectedObject(): void {
     if (!this.#transformControls) return;
     const mesh =
-      this.#selectionModes.has("object") && this.#selectedObjectId
+      this.#selectionItems.length === 0 && this.#selectedObjectId
         ? this.#geometryAdapter.getMesh(this.#selectedObjectId)
         : undefined;
     if (mesh) this.#transformControls.attach(mesh);
     else if (
-      !this.#selectionModes.has("object") &&
       this.#transformMode === "translate" &&
       this.#selectionItems.length > 0
     ) {

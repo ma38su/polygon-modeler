@@ -58,7 +58,7 @@ test("shows the empty editor shell", async ({ page }) => {
   );
   await expect(page.getByTestId("viewport-canvas")).toHaveAttribute(
     "data-selection-mode",
-    "object",
+    "vertex",
   );
   await displayLayers.getByRole("button", { name: "Vertex" }).click();
   await displayLayers.getByRole("button", { name: "Face" }).click();
@@ -72,7 +72,11 @@ test("shows the empty editor shell", async ({ page }) => {
   );
   await displayLayers.getByRole("button", { name: "Face" }).click();
   const selectionModes = page.getByLabel("選択モード");
-  await selectionModes.getByRole("button", { name: "Vertex" }).click();
+  await expect(
+    selectionModes.getByRole("button", { name: "Object" }),
+  ).toHaveCount(0);
+  await selectionModes.getByRole("button", { name: "Edge" }).click();
+  await selectionModes.getByRole("button", { name: "Face" }).click();
   await expect(page.getByTestId("viewport-canvas")).toHaveAttribute(
     "data-selection-mode",
     "vertex",
@@ -138,10 +142,9 @@ test("cancels, commits, and replays a face extrusion dialog", async ({
 }) => {
   await page.goto("/?renderer=webgl2");
   await page.getByRole("button", { name: "Plane追加" }).click();
-  await page
-    .getByLabel("選択モード")
-    .getByRole("button", { name: "Face" })
-    .click();
+  const selectionModes = page.getByLabel("選択モード");
+  await selectionModes.getByRole("button", { name: "Vertex" }).click();
+  await selectionModes.getByRole("button", { name: "Edge" }).click();
   await page.keyboard.press("ControlOrMeta+A");
 
   await page.getByRole("button", { name: "押し出し" }).click();
@@ -174,7 +177,8 @@ test("coordinates viewport focus, shortcuts, context menu, and dirty state", asy
 
   const viewport = page.getByTestId("viewport-canvas");
   await viewport.click({ position: { x: 350, y: 250 } });
-  await page.keyboard.press("4");
+  await page.keyboard.press("1");
+  await page.keyboard.press("2");
   await expect(
     page.getByLabel("選択モード").getByRole("button", { name: "Face" }),
   ).toHaveClass(/active/);

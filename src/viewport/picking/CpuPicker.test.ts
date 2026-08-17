@@ -17,7 +17,7 @@ describe("CpuPicker vertex hit area", () => {
       createBoxMesh(),
     ).toSnapshot();
     const adapter = new RenderGeometryAdapter();
-    adapter.sync([object], new Set(), "vertex", new Set(["vertex"]), [], {
+    adapter.sync([object], new Set(), [], {
       vertices: true,
       edges: false,
       faces: false,
@@ -54,14 +54,11 @@ describe("CpuPicker vertex hit area", () => {
       createBoxMesh(),
     ).toSnapshot();
     const adapter = new RenderGeometryAdapter();
-    adapter.sync(
-      [object],
-      new Set(),
-      "vertex",
-      new Set(["vertex", "edge", "face"]),
-      [],
-      { vertices: true, edges: true, faces: true },
-    );
+    adapter.sync([object], new Set(), [], {
+      vertices: true,
+      edges: true,
+      faces: true,
+    });
     const camera = new PerspectiveCamera(45, 1, 0.01, 100);
     camera.position.set(0, 0, 5);
     camera.lookAt(0, 0, 0);
@@ -120,7 +117,7 @@ describe("CpuPicker face picking", () => {
       new Vector3().subVectors(b!, a!).cross(new Vector3().subVectors(c!, a!))
         .y,
     ).toBeGreaterThan(0);
-    adapter.sync([object], new Set(), "face", new Set(["face"]), [], {
+    adapter.sync([object], new Set(), [], {
       vertices: false,
       edges: false,
       faces: true,

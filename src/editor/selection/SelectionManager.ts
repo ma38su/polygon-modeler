@@ -1,5 +1,5 @@
 import type { EdgeId, FaceId, ObjectId, VertexId } from "../document/types";
-export type SelectionMode = "object" | "vertex" | "edge" | "face";
+export type SelectionMode = "vertex" | "edge" | "face";
 export type ElementId = ObjectId | VertexId | EdgeId | FaceId;
 export interface SelectionItem {
   readonly objectId: ObjectId;
@@ -11,10 +11,9 @@ export interface SelectionSnapshot {
 }
 const keyOf = (item: SelectionItem) => `${item.objectId}:${item.elementId}`;
 export class SelectionManager {
-  readonly #modes = new Set<SelectionMode>(["object"]);
+  readonly #modes = new Set<SelectionMode>(["vertex", "edge", "face"]);
   readonly #items = new Map<string, SelectionItem>();
   get mode() {
-    if (this.#modes.has("object")) return "object";
     return (
       (["vertex", "edge", "face"] as const).find((mode) =>
         this.#modes.has(mode),
@@ -34,8 +33,7 @@ export class SelectionManager {
     this.#items.clear();
     return true;
   }
-  toggleMode(mode: Exclude<SelectionMode, "object">) {
-    if (this.#modes.has("object")) this.#modes.clear();
+  toggleMode(mode: SelectionMode) {
     if (this.#modes.has(mode)) this.#modes.delete(mode);
     else this.#modes.add(mode);
     this.#items.clear();

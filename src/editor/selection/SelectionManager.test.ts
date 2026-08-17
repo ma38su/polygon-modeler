@@ -26,12 +26,15 @@ describe("SelectionManager", () => {
   });
   it("toggles vertex, edge, and face filters independently", () => {
     const selection = new SelectionManager();
+    expect(selection.modes).toEqual(new Set(["vertex", "edge", "face"]));
     selection.toggleMode("vertex");
     selection.toggleMode("edge");
     selection.toggleMode("face");
-    expect(selection.modes).toEqual(new Set(["vertex", "edge", "face"]));
+    expect(selection.modes).toEqual(new Set());
+    selection.toggleMode("vertex");
+    selection.toggleMode("face");
     selection.toggleMode("edge");
-    expect(selection.modes).toEqual(new Set(["vertex", "face"]));
+    expect(selection.modes).toEqual(new Set(["vertex", "face", "edge"]));
   });
   it("removes elements for a deleted object", () => {
     const s = new SelectionManager();

@@ -21,6 +21,18 @@ describe("Editor", () => {
     editor.deleteSelectedObjects();
     expect(editor.createBox()).not.toBe(first);
   });
+  it("selects objects from the outliner without changing element filters", () => {
+    const editor = new Editor();
+    const objectId = editor.createBox();
+    editor.toggleSelectionMode("edge");
+    const modes = editor.getSnapshot().selectionModes;
+
+    editor.selectObject(objectId);
+
+    expect(editor.getSnapshot().selectedObjectIds).toEqual(new Set([objectId]));
+    expect(editor.getSnapshot().selectionItems).toHaveLength(0);
+    expect(editor.getSnapshot().selectionModes).toEqual(modes);
+  });
   it("selects all stable elements and clears them on mode changes", () => {
     const editor = new Editor();
     editor.createBox();

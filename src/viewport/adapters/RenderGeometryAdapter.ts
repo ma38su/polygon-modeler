@@ -18,10 +18,7 @@ import type {
   ObjectId,
 } from "../../editor/document/types";
 import { triangulate } from "../../editor/mesh/triangulate";
-import type {
-  SelectionItem,
-  SelectionMode,
-} from "../../editor/selection/SelectionManager";
+import type { SelectionItem } from "../../editor/selection/SelectionManager";
 import { DEFAULT_DISPLAY_LAYERS, type DisplayLayers } from "../displayLayers";
 
 const OVERLAY_NAME = "selection-overlay";
@@ -37,8 +34,6 @@ export class RenderGeometryAdapter {
   sync(
     objects: readonly ModelObjectSnapshot[],
     selectedIds: ReadonlySet<ObjectId>,
-    selectionMode: SelectionMode = "object",
-    selectionModes: ReadonlySet<SelectionMode> = new Set([selectionMode]),
     selectionItems: readonly SelectionItem[] = [],
     displayLayers: DisplayLayers = DEFAULT_DISPLAY_LAYERS,
   ): void {
@@ -76,7 +71,7 @@ export class RenderGeometryAdapter {
       );
       const material = mesh.material as MeshStandardMaterial;
       const objectSelected =
-        selectionModes.has("object") && selectedIds.has(object.id);
+        selectionItems.length === 0 && selectedIds.has(object.id);
       material.color.set(objectSelected ? 0x78a0ff : 0x9aa5b5);
       material.emissive.set(objectSelected ? 0x172a55 : 0x000000);
       material.transparent = !displayLayers.faces;

@@ -18,8 +18,6 @@ export class CpuPicker {
     objects: readonly ModelObjectSnapshot[],
     modes: ReadonlySet<SelectionMode>,
   ): SelectionItem | undefined {
-    if (modes.has("object"))
-      return this.pick(x, y, bounds, camera, adapter, objects, "object");
     for (const mode of ["vertex", "edge", "face"] as const) {
       if (!modes.has(mode)) continue;
       const item = this.pick(x, y, bounds, camera, adapter, objects, mode);
@@ -52,7 +50,6 @@ export class CpuPicker {
     const objectId = adapter.getObjectId(mesh);
     const object = objects.find((candidate) => candidate.id === objectId);
     if (!objectId || !object) return undefined;
-    if (mode === "object") return { objectId, elementId: objectId };
     if (mode === "face") {
       const triangle = hit.faceIndex ?? 0;
       let cursor = 0;

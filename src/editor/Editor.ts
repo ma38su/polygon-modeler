@@ -87,13 +87,7 @@ export class Editor {
       ),
       this.document,
     );
-    this.selection.setMode("object");
-    this.selection.selectAll(
-      objects.map((object) => ({
-        objectId: object.id,
-        elementId: object.id,
-      })),
-    );
+    this.selection.clear();
     this.#selectedObjectIds.clear();
     objects.forEach((object) => this.#selectedObjectIds.add(object.id));
     this.#commit(true);
@@ -108,8 +102,7 @@ export class Editor {
     this.history.execute(new CreateObjectCommand(object), this.document);
     this.#selectedObjectIds.clear();
     this.#selectedObjectIds.add(id);
-    this.selection.setMode("object");
-    this.selection.replace({ objectId: id, elementId: id });
+    this.selection.clear();
     this.#commit(true);
     return id;
   }
@@ -126,9 +119,8 @@ export class Editor {
   selectObject(id?: ObjectId): void {
     if (id && !this.document.getObject(id)) return;
     this.#selectedObjectIds.clear();
-    this.selection.setMode("object");
     if (id) this.#selectedObjectIds.add(id);
-    this.selection.replace(id ? { objectId: id, elementId: id } : undefined);
+    this.selection.clear();
     this.#commit();
   }
   setSelectionMode(mode: SelectionMode): void {
@@ -136,7 +128,7 @@ export class Editor {
     this.#selectedObjectIds.clear();
     this.#commit();
   }
-  toggleSelectionMode(mode: Exclude<SelectionMode, "object">): void {
+  toggleSelectionMode(mode: SelectionMode): void {
     this.selection.toggleMode(mode);
     this.#selectedObjectIds.clear();
     this.#commit();
@@ -157,8 +149,6 @@ export class Editor {
   selectAll(): void {
     const items: SelectionItem[] = [];
     for (const object of this.document.toSnapshot()) {
-      if (this.selection.modes.has("object"))
-        items.push({ objectId: object.id, elementId: object.id });
       if (this.selection.modes.has("vertex"))
         object.mesh.vertexIds.forEach((id) =>
           items.push({ objectId: object.id, elementId: id }),
@@ -277,7 +267,7 @@ export class Editor {
     });
   }
   deleteSelectedElements(): void {
-    if (this.selection.modes.has("object")) {
+    if (this.selection.items.length === 0) {
       this.deleteSelectedObjects();
       return;
     }
@@ -515,7 +505,6 @@ export class Editor {
     this.document.clear();
     for (const object of objects) this.document.addObject(object);
     this.history.clear();
-    this.selection.setMode("object");
     this.selection.clear();
     this.#selectedObjectIds.clear();
     this.#nextObjectId =

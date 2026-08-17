@@ -71,7 +71,6 @@ export function ViewportCanvas({
       viewportRef.current?.syncObjects(
         objects,
         selectedObjectIds,
-        selectionMode,
         selectionModes,
         selectionItems,
         displayLayers,
