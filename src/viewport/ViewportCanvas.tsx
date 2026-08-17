@@ -4,6 +4,8 @@ import {
   Viewport,
   type AxisConstraint,
   type ElementTransformCommitListener,
+  type NormalHandleListener,
+  type NormalHandleOperation,
   type SnapSettings,
   type TransformCommitListener,
   type TransformMode,
@@ -25,7 +27,7 @@ export interface ViewportCanvasProps {
   projection: "perspective" | "orthographic";
   objects: readonly ModelObjectSnapshot[];
   selectedObjectIds: ReadonlySet<ObjectId>;
-  transformMode: TransformMode;
+  transformMode?: TransformMode;
   onTransformCommit: TransformCommitListener;
   onElementTransformCommit: ElementTransformCommitListener;
   selectionModes: ReadonlySet<SelectionMode>;
@@ -39,6 +41,8 @@ export interface ViewportCanvasProps {
   snapSettings: SnapSettings;
   modelingPreviewActive: boolean;
   geometryEpoch: number;
+  normalOperation?: NormalHandleOperation;
+  onNormalHandle: NormalHandleListener;
 }
 
 export function ViewportCanvas({
@@ -60,6 +64,8 @@ export function ViewportCanvas({
   snapSettings,
   modelingPreviewActive,
   geometryEpoch,
+  normalOperation,
+  onNormalHandle,
 }: ViewportCanvasProps) {
   const hostRef = useRef<HTMLDivElement>(null);
   const viewportRef = useRef<Viewport>(null);
@@ -76,12 +82,18 @@ export function ViewportCanvas({
     viewportRef.current = viewport;
     viewport.setTransformCommitListener(onTransformCommit);
     viewport.setElementTransformCommitListener(onElementTransformCommit);
+    viewport.setNormalHandleListener(onNormalHandle);
     void viewport.initialize();
     return () => {
       viewportRef.current = null;
       viewport.dispose();
     };
-  }, [onElementTransformCommit, onStatusChange, onTransformCommit]);
+  }, [
+    onElementTransformCommit,
+    onNormalHandle,
+    onStatusChange,
+    onTransformCommit,
+  ]);
 
   useEffect(() => viewportRef.current?.setProjection(projection), [projection]);
   useEffect(
@@ -104,6 +116,10 @@ export function ViewportCanvas({
     ],
   );
   useEffect(
+    () => viewportRef.current?.setNormalOperation(normalOperation),
+    [normalOperation],
+  );
+  useEffect(
     () => viewportRef.current?.setAxisConstraint(axisConstraint),
     [axisConstraint],
   );
@@ -119,16 +135,17 @@ export function ViewportCanvas({
     () => viewportRef.current?.setPicking(selectionModes, onPick),
     [selectionModes, onPick],
   );
-  useEffect(
-    () => viewportRef.current?.setTransformMode(transformMode),
-    [transformMode],
-  );
+  useEffect(() => {
+    if (transformMode) viewportRef.current?.setTransformMode(transformMode);
+    else viewportRef.current?.setTransformEnabled(false);
+  }, [transformMode]);
   useEffect(
     () =>
       viewportRef.current?.setTransformInteractionBlocked(
-        selectionGesture !== "click" || modelingPreviewActive,
+        selectionGesture !== "click" ||
+          (modelingPreviewActive && !normalOperation),
       ),
-    [modelingPreviewActive, selectionGesture],
+    [modelingPreviewActive, normalOperation, selectionGesture],
   );
 
   return (
@@ -149,6 +166,7 @@ export function ViewportCanvas({
       data-edge-snap={snapSettings.edge}
       data-face-snap={snapSettings.face}
       data-modeling-preview={modelingPreviewActive}
+      data-normal-operation={normalOperation ?? "off"}
       tabIndex={0}
       onPointerDown={(event) => event.currentTarget.focus()}
       onPointerDownCapture={(event) => {

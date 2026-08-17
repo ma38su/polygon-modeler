@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import type { Editor } from "../../editor/Editor";
 import type { ModelObjectSnapshot } from "../../editor/document/types";
+import type { NormalHandleOperation } from "../../viewport/Viewport";
 import {
   Combine,
   BetweenHorizontalEnd,
@@ -93,10 +94,18 @@ export function ElementTransformPanel({
   editor,
   onError,
   onPreview,
+  normalOperation,
+  onNormalOperationChange,
+  canExtrude,
+  canNormalMove,
 }: {
   editor: Editor;
   onError(message: string): void;
   onPreview(objects?: readonly ModelObjectSnapshot[]): void;
+  normalOperation?: NormalHandleOperation;
+  onNormalOperationChange(operation: NormalHandleOperation): void;
+  canExtrude: boolean;
+  canNormalMove: boolean;
 }) {
   const [move, setMove] = useState<Values>({ x: 0, y: 0, z: 0 });
   const [rotate, setRotate] = useState<Values>({ x: 0, y: 0, z: 0 });
@@ -137,6 +146,7 @@ export function ElementTransformPanel({
   };
   useEffect(() => () => onPreview(undefined), [onPreview]);
   const openModelingDialog = (operation: ModelingOperation) => {
+    if (normalOperation) onNormalOperationChange(normalOperation);
     const value = modelingOperations[operation].defaultValue;
     setModelingOperation(operation);
     setModelingValue(value);
@@ -282,9 +292,23 @@ export function ElementTransformPanel({
       </fieldset>
       <fieldset className="modeling-actions">
         <legend>モデリング</legend>
-        <button type="button" onClick={() => openModelingDialog("extrude")}>
+        <button
+          type="button"
+          className={normalOperation === "extrude" ? "active" : undefined}
+          aria-pressed={normalOperation === "extrude"}
+          disabled={!canExtrude}
+          onClick={() => onNormalOperationChange("extrude")}
+        >
           <Layers3 aria-hidden="true" />
-          押し出し
+          押し出し操作
+        </button>
+        <button
+          type="button"
+          disabled={!canExtrude}
+          onClick={() => openModelingDialog("extrude")}
+        >
+          <Layers3 aria-hidden="true" />
+          押し出し数値
         </button>
         <button type="button" onClick={() => openModelingDialog("inset")}>
           <Shrink aria-hidden="true" />
@@ -294,9 +318,23 @@ export function ElementTransformPanel({
           <Slice aria-hidden="true" />
           ベベル
         </button>
-        <button type="button" onClick={() => openModelingDialog("normalMove")}>
+        <button
+          type="button"
+          className={normalOperation === "normalMove" ? "active" : undefined}
+          aria-pressed={normalOperation === "normalMove"}
+          disabled={!canNormalMove}
+          onClick={() => onNormalOperationChange("normalMove")}
+        >
           <ArrowUpFromLine aria-hidden="true" />
-          法線移動
+          法線移動操作
+        </button>
+        <button
+          type="button"
+          disabled={!canNormalMove}
+          onClick={() => openModelingDialog("normalMove")}
+        >
+          <ArrowUpFromLine aria-hidden="true" />
+          法線移動数値
         </button>
         <button
           type="button"

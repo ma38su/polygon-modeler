@@ -63,6 +63,7 @@ export interface ViewportStatus {
 type StatusListener = (status: ViewportStatus) => void;
 type Renderer = WebGLRenderer | WebGpuRenderer;
 export type TransformMode = "translate" | "rotate" | "scale";
+export type NormalHandleOperation = "extrude" | "normalMove";
 export type AxisConstraint = "all" | "x" | "y" | "z";
 export interface SnapSettings {
   readonly grid: boolean;
@@ -73,7 +74,6 @@ export interface SnapSettings {
 }
 export type TransformCommitListener = (
   id: ObjectId,
-  before: TransformValue,
   after: TransformValue,
 ) => void;
 export interface ElementTransformUpdate {
@@ -87,6 +87,11 @@ export type ElementTransformCommitListener = (
   mode: TransformMode,
   updates: readonly ElementTransformUpdate[],
 ) => void;
+export type NormalHandleListener = (
+  operation: NormalHandleOperation,
+  distance: number,
+  commit: boolean,
+) => void;
 
 export class Viewport {
   readonly element: HTMLElement;
@@ -95,6 +100,7 @@ export class Viewport {
   readonly #picker = new CpuPicker();
   readonly #regionPicker = new RegionPicker();
   readonly #elementPivot = new Object3D();
+  readonly #normalPivot = new Object3D();
   readonly #perspectiveCamera = new PerspectiveCamera(45, 1, 0.01, 10_000);
   readonly #orthographicCamera = new OrthographicCamera(
     -5,
@@ -111,6 +117,7 @@ export class Viewport {
   #controls?: OrbitControls;
   #transformControls?: TransformControls;
   #transformMode: TransformMode = "translate";
+  #transformEnabled = false;
   #axisConstraint: AxisConstraint = "all";
   #transformOrientation: TransformOrientation = "world";
   #snapSettings: SnapSettings = {
@@ -124,6 +131,11 @@ export class Viewport {
   #fineTransform = false;
   #transformCommitListener?: TransformCommitListener;
   #elementTransformCommitListener?: ElementTransformCommitListener;
+  #normalHandleListener?: NormalHandleListener;
+  #normalOperation?: NormalHandleOperation;
+  #normalOrigin?: Vector3;
+  #normalDirection?: Vector3;
+  #normalDragging = false;
   #selectedObjectId?: ObjectId;
   #transformBefore?: TransformValue;
   #objects: readonly ModelObjectSnapshot[] = [];
@@ -147,6 +159,7 @@ export class Viewport {
     this.#scene.add(new HemisphereLight(0xffffff, 0x28303d, 1.5));
     this.#scene.add(this.#geometryAdapter.group);
     this.#scene.add(this.#elementPivot);
+    this.#scene.add(this.#normalPivot);
     this.#perspectiveCamera.position.set(6, 5, 8);
     this.#orthographicCamera.position.copy(this.#perspectiveCamera.position);
 
@@ -222,6 +235,7 @@ export class Viewport {
     this.#selectionModes = selectionModes;
     this.#selectionItems = selectionItems;
     this.#selectedObjectId = selectedIds.values().next().value;
+    if (this.#normalDragging) return;
     this.#attachSelectedObject();
   }
   setPicking(
@@ -249,7 +263,14 @@ export class Viewport {
 
   setTransformMode(mode: TransformMode): void {
     this.#transformMode = mode;
+    this.#transformEnabled = true;
     this.#transformControls?.setMode(mode);
+    this.#attachSelectedObject();
+  }
+
+  setTransformEnabled(enabled: boolean): void {
+    if (this.#transformEnabled === enabled) return;
+    this.#transformEnabled = enabled;
     this.#attachSelectedObject();
   }
 
@@ -284,6 +305,19 @@ export class Viewport {
     listener: ElementTransformCommitListener,
   ): void {
     this.#elementTransformCommitListener = listener;
+  }
+
+  setNormalHandleListener(listener: NormalHandleListener): void {
+    this.#normalHandleListener = listener;
+  }
+
+  setNormalOperation(operation?: NormalHandleOperation): void {
+    if (this.#normalOperation === operation) return;
+    this.#normalOperation = operation;
+    this.#normalDragging = false;
+    this.#normalOrigin = undefined;
+    this.#normalDirection = undefined;
+    this.#attachSelectedObject();
   }
 
   dispose(): void {
@@ -435,10 +469,41 @@ export class Viewport {
 
   #attachSelectedObject(): void {
     if (!this.#transformControls) return;
-    if (this.#transformInteractionBlocked) {
+    if (
+      this.#transformInteractionBlocked ||
+      (!this.#transformEnabled && !this.#normalOperation)
+    ) {
       this.#transformControls.detach();
       return;
     }
+    if (this.#normalOperation && this.#selectionItems.length > 0) {
+      const frame = selectionFrameWorld(
+        this.#objects,
+        this.#selectionItems,
+        this.#geometryAdapter,
+        "normal",
+      );
+      if (!frame) {
+        this.#transformControls.detach();
+        return;
+      }
+      this.#normalOrigin = frame.position.clone();
+      this.#normalDirection = new Vector3(0, 0, 1)
+        .applyQuaternion(frame.quaternion)
+        .normalize();
+      this.#normalPivot.position.copy(frame.position);
+      this.#normalPivot.quaternion.copy(frame.quaternion);
+      this.#normalPivot.scale.set(1, 1, 1);
+      this.#transformControls.setMode("translate");
+      this.#transformControls.setSpace("local");
+      this.#transformControls.showX = false;
+      this.#transformControls.showY = false;
+      this.#transformControls.showZ = true;
+      this.#transformControls.attach(this.#normalPivot);
+      return;
+    }
+    this.#transformControls.setMode(this.#transformMode);
+    this.setAxisConstraint(this.#axisConstraint);
     const mesh =
       this.#selectionItems.length === 0 && this.#selectedObjectId
         ? this.#geometryAdapter.getMesh(this.#selectedObjectId)
@@ -467,6 +532,10 @@ export class Viewport {
   }
 
   #handleTransformStart = (): void => {
+    if (this.#transformControls?.object === this.#normalPivot) {
+      this.#normalDragging = true;
+      return;
+    }
     if (this.#transformControls?.object === this.#elementPivot) {
       this.#transformBefore = {
         position: {
@@ -492,6 +561,15 @@ export class Viewport {
 
   #handleTransformEnd = (): void => {
     if (
+      this.#transformControls?.object === this.#normalPivot &&
+      this.#normalOperation
+    ) {
+      const distance = this.#normalHandleDistance();
+      this.#normalDragging = false;
+      this.#normalHandleListener?.(this.#normalOperation, distance, true);
+      return;
+    }
+    if (
       this.#transformControls?.object === this.#elementPivot &&
       this.#transformBefore
     ) {
@@ -510,11 +588,7 @@ export class Viewport {
     const id = this.#selectedObjectId;
     const mesh = id ? this.#geometryAdapter.getMesh(id) : undefined;
     if (id && mesh && this.#transformBefore) {
-      this.#transformCommitListener?.(
-        id,
-        this.#transformBefore,
-        this.#readTransform(mesh),
-      );
+      this.#transformCommitListener?.(id, this.#readTransform(mesh));
     }
     this.#transformBefore = undefined;
   };
@@ -535,6 +609,17 @@ export class Viewport {
   }
 
   #handleTransformPreview = (): void => {
+    if (
+      this.#transformControls?.object === this.#normalPivot &&
+      this.#normalOperation
+    ) {
+      this.#normalHandleListener?.(
+        this.#normalOperation,
+        this.#normalHandleDistance(),
+        false,
+      );
+      return;
+    }
     if (
       this.#transformControls?.object !== this.#elementPivot ||
       !this.#transformBefore ||
@@ -570,6 +655,14 @@ export class Viewport {
       this.#updatePreviewOverlays(object, preview, position.array);
     }
   };
+
+  #normalHandleDistance(): number {
+    if (!this.#normalOrigin || !this.#normalDirection) return 0;
+    return this.#normalPivot.position
+      .clone()
+      .sub(this.#normalOrigin)
+      .dot(this.#normalDirection);
+  }
 
   #restoreElementPreview(): void {
     for (const [objectId, preview] of this.#elementPreview) {

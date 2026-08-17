@@ -42,6 +42,7 @@
   --header-height: 44px;
   --status-height: 26px;
   --icon-sm: 14px;
+  --icon-xs: 13px;
   --icon-md: 16px;
   --icon-lg: 18px;
 
@@ -57,9 +58,12 @@
   --text-primary: #edf1f7;
   --text-secondary: #c1c8d4;
   --text-muted: #7f8999;
+  --text-subtle: #687284;
   --accent: #5d8cff;
   --accent-bright: #8eaeff;
+  --accent-strong: #a8beff;
   --accent-surface: color-mix(in srgb, var(--accent), transparent 86%);
+  --accent-muted: color-mix(in srgb, var(--accent), transparent 78%);
   --danger: #e65f5f;
   --success: #55c77a;
   --warning: #d9a441;

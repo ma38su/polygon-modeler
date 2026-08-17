@@ -10,6 +10,9 @@ import {
   GitMerge,
   Minus,
   RefreshCw,
+  Expand,
+  Move3D,
+  Rotate3D,
 } from "lucide-react";
 import type { BooleanOperation } from "../../editor/boolean/booleanOperations";
 import type { Editor } from "../../editor/Editor";
@@ -18,12 +21,20 @@ import { ElementTransformPanel } from "../inspector/ElementTransformPanel";
 import { TransformInspector } from "../inspector/TransformInspector";
 import { MaterialInspector } from "../inspector/MaterialInspector";
 import { diagnoseMesh } from "../../editor/mesh/meshDiagnostics";
+import type {
+  NormalHandleOperation,
+  TransformMode,
+} from "../../viewport/Viewport";
 
 interface ScenePanelProps {
   editor: Editor;
   snapshot: EditorSnapshot;
   onError(message: string): void;
   onModelingPreview(objects?: EditorSnapshot["objects"]): void;
+  transformMode?: TransformMode;
+  onTransformModeChange(mode: TransformMode): void;
+  normalOperation?: NormalHandleOperation;
+  onNormalOperationChange(operation: NormalHandleOperation): void;
 }
 
 export function ScenePanel({
@@ -31,6 +42,10 @@ export function ScenePanel({
   snapshot,
   onError,
   onModelingPreview,
+  transformMode,
+  onTransformModeChange,
+  normalOperation,
+  onNormalOperationChange,
 }: ScenePanelProps) {
   const [booleanPending, setBooleanPending] = useState(false);
   const [mergeDistance, setMergeDistance] = useState(0.0001);
@@ -40,6 +55,16 @@ export function ScenePanel({
   const diagnostics = selectedObject
     ? diagnoseMesh(selectedObject.mesh)
     : undefined;
+  const selectedElementKinds = snapshot.selectionItems.reduce((kinds, item) => {
+    const object = snapshot.objects.find(
+      (candidate) => candidate.id === item.objectId,
+    );
+    if (object?.mesh.faceIds.some((id) => id === item.elementId))
+      kinds.add("face");
+    if (object?.mesh.edges.some((edge) => edge.id === item.elementId))
+      kinds.add("edge");
+    return kinds;
+  }, new Set<"edge" | "face">());
   const runAction = (action: () => void) => {
     try {
       action();
@@ -153,11 +178,40 @@ export function ScenePanel({
       </section>
       <section aria-labelledby="inspector-title">
         <h2 id="inspector-title">インスペクター</h2>
+        {(selectedObject || snapshot.selectionItems.length > 0) && (
+          <div className="transform-tools" aria-label="変形ツール">
+            {(
+              [
+                ["translate", "移動", Move3D],
+                ["rotate", "回転", Rotate3D],
+                ["scale", "拡大縮小", Expand],
+              ] as const
+            ).map(([mode, label, Icon]) => (
+              <button
+                type="button"
+                className={transformMode === mode ? "active" : undefined}
+                aria-pressed={transformMode === mode}
+                onClick={() => onTransformModeChange(mode)}
+                key={mode}
+              >
+                <Icon aria-hidden="true" />
+                {label}
+              </button>
+            ))}
+          </div>
+        )}
         {snapshot.selectionItems.length ? (
           <ElementTransformPanel
             editor={editor}
             onError={onError}
             onPreview={onModelingPreview}
+            normalOperation={normalOperation}
+            onNormalOperationChange={onNormalOperationChange}
+            canExtrude={selectedElementKinds.has("face")}
+            canNormalMove={
+              selectedElementKinds.has("face") ||
+              selectedElementKinds.has("edge")
+            }
           />
         ) : selectedObject ? (
           <>

@@ -6,17 +6,14 @@ import {
   BoxSelect,
   ChevronDown,
   CircleGauge,
-  Expand,
   FileDown,
   FolderOpen,
   HelpCircle,
   Import,
   LassoSelect,
   MousePointer2,
-  Move3D,
   Plus,
   Redo2,
-  Rotate3D,
   RotateCcw,
   Trash2,
   Upload,
@@ -27,6 +24,7 @@ import type { SelectionGesture } from "./viewport/ViewportCanvas";
 import type { ViewportStatus } from "./viewport/Viewport";
 import type {
   AxisConstraint,
+  NormalHandleOperation,
   SnapSettings,
   TransformMode,
 } from "./viewport/Viewport";
@@ -58,8 +56,10 @@ export default function App() {
   const [projection, setProjection] = useState<"perspective" | "orthographic">(
     "perspective",
   );
-  const [transformMode, setTransformMode] =
-    useState<TransformMode>("translate");
+  const [transformMode, setTransformMode] = useState<TransformMode>();
+  const [normalOperation, setNormalOperation] =
+    useState<NormalHandleOperation>();
+  const [normalHandleDistance, setNormalHandleDistance] = useState(0);
   const [selectionGesture, setSelectionGesture] =
     useState<SelectionGesture>("click");
   const [axisConstraint, setAxisConstraint] = useState<AxisConstraint>("all");
@@ -83,9 +83,9 @@ export default function App() {
   const [geometryEpoch, setGeometryEpoch] = useState(0);
   const [contextMenu, setContextMenu] = useState<{ x: number; y: number }>();
   const contextMenuRef = useRef<HTMLDivElement>(null);
+  const normalPreviewFrameRef = useRef<number | undefined>(undefined);
   const openShortcutHelp = useCallback(() => setShowShortcuts(true), []);
   const activateTransformMode = useCallback((mode: TransformMode) => {
-    setSelectionGesture("click");
     setTransformMode(mode);
   }, []);
   const persistence = useProjectPersistence(
@@ -113,14 +113,30 @@ export default function App() {
     const timer = window.setTimeout(() => setErrorMessage(undefined), 5000);
     return () => window.clearTimeout(timer);
   }, [errorMessage]);
+  useEffect(() => {
+    if (!normalOperation) return;
+    const cancel = (event: KeyboardEvent) => {
+      if (event.key !== "Escape") return;
+      if (normalPreviewFrameRef.current !== undefined)
+        cancelAnimationFrame(normalPreviewFrameRef.current);
+      normalPreviewFrameRef.current = undefined;
+      setNormalOperation(undefined);
+      setNormalHandleDistance(0);
+      setModelingPreview(undefined);
+    };
+    window.addEventListener("keydown", cancel);
+    return () => window.removeEventListener("keydown", cancel);
+  }, [normalOperation]);
   const handleViewportStatus = useCallback((status: ViewportStatus) => {
     setCapability(
       status.error ? "unsupported" : (status.backend ?? "checking"),
     );
   }, []);
   const handleTransformCommit = useCallback(
-    (...args: Parameters<typeof editor.transformObject>) =>
-      editor.transformObject(...args),
+    (
+      id: Parameters<typeof editor.transformObject>[0],
+      after: Parameters<typeof editor.transformObject>[1],
+    ) => editor.transformObject(id, after),
     [editor],
   );
   const handleElementTransformCommit = useCallback(
@@ -154,6 +170,45 @@ export default function App() {
       setGeometryEpoch((current) => current + 1);
     },
     [],
+  );
+  const handleNormalHandle = useCallback(
+    (operation: NormalHandleOperation, distance: number, commit: boolean) => {
+      setNormalHandleDistance(distance);
+      if (!commit) {
+        if (normalPreviewFrameRef.current !== undefined)
+          cancelAnimationFrame(normalPreviewFrameRef.current);
+        normalPreviewFrameRef.current = requestAnimationFrame(() => {
+          normalPreviewFrameRef.current = undefined;
+          try {
+            setModelingPreview(
+              operation === "extrude"
+                ? editor.previewExtrudeSelectedFaces(distance)
+                : editor.previewMoveSelectedAlongNormals(distance),
+            );
+            setGeometryEpoch((current) => current + 1);
+          } catch (error) {
+            setErrorMessage(
+              error instanceof Error ? error.message : String(error),
+            );
+          }
+        });
+        return;
+      }
+      if (normalPreviewFrameRef.current !== undefined) {
+        cancelAnimationFrame(normalPreviewFrameRef.current);
+        normalPreviewFrameRef.current = undefined;
+      }
+      try {
+        setModelingPreview(undefined);
+        if (operation === "extrude") editor.extrudeSelectedFaces(distance);
+        else editor.moveSelectedAlongNormals(distance);
+        setNormalOperation(undefined);
+        setNormalHandleDistance(0);
+      } catch (error) {
+        setErrorMessage(error instanceof Error ? error.message : String(error));
+      }
+    },
+    [editor],
   );
   const toggleDisplayLayer = useCallback((layer: keyof DisplayLayers) => {
     setDisplayLayers((current) => ({
@@ -272,21 +327,6 @@ export default function App() {
               {label}
             </button>
           ))}
-          {[
-            { label: "移動", icon: Move3D, mode: "translate" as const },
-            { label: "回転", icon: Rotate3D, mode: "rotate" as const },
-            { label: "拡大縮小", icon: Expand, mode: "scale" as const },
-          ].map(({ label, icon: Icon, mode }) => (
-            <button
-              type="button"
-              className={`tool-button${selectionGesture === "click" && transformMode === mode ? " active" : ""}`}
-              onClick={() => activateTransformMode(mode)}
-              key={label}
-            >
-              <Icon aria-hidden="true" />
-              {label}
-            </button>
-          ))}
           <div className="tool-divider" />
           <button
             type="button"
@@ -355,13 +395,17 @@ export default function App() {
             onStatusChange={handleViewportStatus}
             objects={modelingPreview ?? snapshot.objects}
             selectedObjectIds={
-              modelingPreview ? new Set() : snapshot.selectedObjectIds
+              modelingPreview && !normalOperation
+                ? new Set()
+                : snapshot.selectedObjectIds
             }
             transformMode={transformMode}
             onTransformCommit={handleTransformCommit}
             onElementTransformCommit={handleElementTransformCommit}
             selectionModes={snapshot.selectionModes}
-            selectionItems={modelingPreview ? [] : snapshot.selectionItems}
+            selectionItems={
+              modelingPreview && !normalOperation ? [] : snapshot.selectionItems
+            }
             displayLayers={displayLayers}
             onPick={handlePick}
             selectionGesture={selectionGesture}
@@ -371,7 +415,25 @@ export default function App() {
             snapSettings={snapSettings}
             modelingPreviewActive={Boolean(modelingPreview)}
             geometryEpoch={geometryEpoch}
+            normalOperation={normalOperation}
+            onNormalHandle={handleNormalHandle}
           />
+          {normalOperation && (
+            <div className="normal-operation-badge" role="status">
+              {normalOperation === "extrude" ? "押し出し" : "法線移動"}:{" "}
+              {normalHandleDistance.toFixed(3)}
+              <button
+                type="button"
+                onClick={() => {
+                  setNormalOperation(undefined);
+                  setModelingPreview(undefined);
+                  setNormalHandleDistance(0);
+                }}
+              >
+                キャンセル
+              </button>
+            </div>
+          )}
           {contextMenu && (
             <div
               ref={contextMenuRef}
@@ -439,11 +501,23 @@ export default function App() {
           snapshot={snapshot}
           onError={setErrorMessage}
           onModelingPreview={handleModelingPreview}
+          transformMode={transformMode}
+          onTransformModeChange={(mode) =>
+            setTransformMode((current) => (current === mode ? undefined : mode))
+          }
+          normalOperation={normalOperation}
+          onNormalOperationChange={(operation) => {
+            setNormalHandleDistance(0);
+            setModelingPreview(undefined);
+            setNormalOperation((current) =>
+              current === operation ? undefined : operation,
+            );
+          }}
         />
       </div>
 
       <footer className="status-bar">
-        <span>ツール: {transformMode}</span>
+        <span>変形: {transformMode ?? "OFF"}</span>
         <span>
           モード: {[...snapshot.selectionModes].join("+") || "選択OFF"}
         </span>

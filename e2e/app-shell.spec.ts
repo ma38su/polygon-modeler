@@ -28,10 +28,9 @@ test("keeps header actions on one line at narrow window widths", async ({
     await expect(button).toHaveCSS("white-space", "nowrap");
     expect((await button.boundingBox())?.height).toBeLessThanOrEqual(36);
   }
-  await expect(page.getByRole("button", { name: "移動" })).toHaveCSS(
-    "font-size",
-    "11px",
-  );
+  await expect(
+    page.getByRole("button", { name: "選択", exact: true }),
+  ).toHaveCSS("font-size", "11px");
   const selectionBox = await page.getByLabel("選択モード").boundingBox();
   const displayBox = await page.getByLabel("表示レイヤー").boundingBox();
   expect(selectionBox).not.toBeNull();
@@ -57,6 +56,18 @@ test("shows the empty editor shell", async ({ page }) => {
   ).toBeVisible();
   await expect(page.getByText("頂点: 8")).toBeVisible();
   await expect(page.getByText("面: 6")).toBeVisible();
+  const transformTools = page.getByLabel("変形ツール");
+  await expect(
+    transformTools.getByRole("button", { name: "移動" }),
+  ).toHaveAttribute("aria-pressed", "false");
+  await transformTools.getByRole("button", { name: "移動" }).click();
+  await expect(
+    transformTools.getByRole("button", { name: "移動" }),
+  ).toHaveAttribute("aria-pressed", "true");
+  await transformTools.getByRole("button", { name: "移動" }).click();
+  await expect(
+    transformTools.getByRole("button", { name: "移動" }),
+  ).toHaveAttribute("aria-pressed", "false");
   await expect(page.getByLabel("メッシュ診断")).toContainText("境界Edge0");
   await page.getByRole("button", { name: "法線再計算" }).click();
   await expect(page.getByRole("button", { name: "元に戻す" })).toBeEnabled();
@@ -195,7 +206,18 @@ test("cancels, commits, and replays a face extrusion dialog", async ({
   await selectionModes.getByRole("button", { name: "Edge" }).click();
   await page.keyboard.press("ControlOrMeta+A");
 
-  await page.getByRole("button", { name: "押し出し" }).click();
+  await page.getByRole("button", { name: "押し出し操作" }).click();
+  await expect(page.getByTestId("viewport-canvas")).toHaveAttribute(
+    "data-normal-operation",
+    "extrude",
+  );
+  await page.getByRole("button", { name: "キャンセル" }).click();
+  await expect(page.getByTestId("viewport-canvas")).toHaveAttribute(
+    "data-normal-operation",
+    "off",
+  );
+
+  await page.getByRole("button", { name: "押し出し数値" }).click();
   const dialog = page.getByRole("dialog", { name: "面を押し出す" });
   await expect(dialog).toBeVisible();
   const distance = dialog.getByLabel("押し出し量");
@@ -211,7 +233,7 @@ test("cancels, commits, and replays a face extrusion dialog", async ({
   await expect(page.getByText("モデリングプレビュー")).toHaveCount(0);
   await expect(page.getByText("面: 1")).toBeVisible();
 
-  await page.getByRole("button", { name: "押し出し" }).click();
+  await page.getByRole("button", { name: "押し出し数値" }).click();
   await expect(dialog.getByLabel("押し出し量")).toHaveValue("1");
   await distance.fill("0.5");
   await dialog.getByRole("button", { name: "押し出す" }).click();
@@ -380,7 +402,7 @@ test("coordinates viewport focus, shortcuts, context menu, and dirty state", asy
     page.getByLabel("選択モード").getByRole("button", { name: "Face" }),
   ).toHaveClass(/active/);
   await page.keyboard.press("r");
-  await expect(page.getByText("ツール: rotate")).toBeVisible();
+  await expect(page.getByText("変形: rotate")).toBeVisible();
 
   await viewport.click({ button: "right", position: { x: 350, y: 250 } });
   await expect(page.getByRole("menu")).toBeVisible();
