@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
+import type { ModelObjectSnapshot } from "./editor/document/types";
 import {
   AlertCircle,
   Box,
@@ -72,6 +73,9 @@ export default function App() {
   const [showShortcuts, setShowShortcuts] = useState(false);
   const [includeHidden, setIncludeHidden] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string>();
+  const [modelingPreview, setModelingPreview] =
+    useState<readonly ModelObjectSnapshot[]>();
+  const [geometryEpoch, setGeometryEpoch] = useState(0);
   const [contextMenu, setContextMenu] = useState<{ x: number; y: number }>();
   const contextMenuRef = useRef<HTMLDivElement>(null);
   const openShortcutHelp = useCallback(() => setShowShortcuts(true), []);
@@ -138,6 +142,13 @@ export default function App() {
     (items: Parameters<typeof editor.selectElements>[0], additive: boolean) =>
       editor.selectElements(items, additive),
     [editor],
+  );
+  const handleModelingPreview = useCallback(
+    (objects?: readonly ModelObjectSnapshot[]) => {
+      setModelingPreview(objects);
+      setGeometryEpoch((current) => current + 1);
+    },
+    [],
   );
   const toggleDisplayLayer = useCallback((layer: keyof DisplayLayers) => {
     setDisplayLayers((current) => ({
@@ -327,22 +338,31 @@ export default function App() {
             snapSettings={snapSettings}
             onSnapSettingsChange={setSnapSettings}
           />
+          {modelingPreview && (
+            <div className="modeling-preview-badge" role="status">
+              モデリングプレビュー
+            </div>
+          )}
           <ViewportCanvas
             projection={projection}
             onStatusChange={handleViewportStatus}
-            objects={snapshot.objects}
-            selectedObjectIds={snapshot.selectedObjectIds}
+            objects={modelingPreview ?? snapshot.objects}
+            selectedObjectIds={
+              modelingPreview ? new Set() : snapshot.selectedObjectIds
+            }
             transformMode={transformMode}
             onTransformCommit={handleTransformCommit}
             onElementTransformCommit={handleElementTransformCommit}
             selectionModes={snapshot.selectionModes}
-            selectionItems={snapshot.selectionItems}
+            selectionItems={modelingPreview ? [] : snapshot.selectionItems}
             displayLayers={displayLayers}
             onPick={handlePick}
             selectionGesture={selectionGesture}
             onPickRegion={handleRegionPick}
             axisConstraint={axisConstraint}
             snapSettings={snapSettings}
+            modelingPreviewActive={Boolean(modelingPreview)}
+            geometryEpoch={geometryEpoch}
           />
           {contextMenu && (
             <div
@@ -410,6 +430,7 @@ export default function App() {
           editor={editor}
           snapshot={snapshot}
           onError={setErrorMessage}
+          onModelingPreview={handleModelingPreview}
         />
       </div>
 

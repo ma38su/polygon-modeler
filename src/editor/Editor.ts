@@ -4,6 +4,7 @@ import type {
   EdgeId,
   EditorSnapshot,
   FaceId,
+  ModelObjectSnapshot,
   ObjectId,
   VertexId,
   Vector3Value,
@@ -360,6 +361,22 @@ export class Editor {
       ),
     );
   }
+  previewExtrudeSelectedFaces(
+    distance: number,
+  ): readonly ModelObjectSnapshot[] {
+    if (!Number.isFinite(distance)) throw new Error("押し出し量が不正です。");
+    return this.#previewTopology((mesh, items) =>
+      extrudeFaces(
+        mesh,
+        new Set(
+          items
+            .map((item) => item.elementId as FaceId)
+            .filter((id) => mesh.faces.has(id)),
+        ),
+        distance,
+      ),
+    );
+  }
   splitSelectedElements(): void {
     this.#applyTopology("要素を分割", (mesh, items) => {
       const face = items.find((item) =>
@@ -435,6 +452,26 @@ export class Editor {
       after: this.selection.snapshot(),
     });
     this.#commit(true);
+  }
+  #previewTopology(
+    operation: (
+      mesh: EditableMesh,
+      items: readonly SelectionItem[],
+    ) => EditableMesh,
+  ): readonly ModelObjectSnapshot[] {
+    const previews = new Map<ObjectId, EditableMesh>();
+    for (const [objectId, items] of this.#selectionGroups()) {
+      const object = this.document.getObject(objectId);
+      if (!object) continue;
+      const after = operation(object.mesh, items);
+      const validation = validateMesh(after);
+      if (!validation.valid) throw new Error(validation.errors.join("\n"));
+      previews.set(objectId, after);
+    }
+    return this.document.toSnapshot().map((object) => {
+      const mesh = previews.get(object.id);
+      return mesh ? { ...object, mesh: mesh.toMeshData() } : object;
+    });
   }
   #selectionGroups(): Map<ObjectId, SelectionItem[]> {
     const groups = new Map<ObjectId, SelectionItem[]>();

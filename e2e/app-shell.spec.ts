@@ -172,10 +172,16 @@ test("cancels, commits, and replays a face extrusion dialog", async ({
   const dialog = page.getByRole("dialog", { name: "面を押し出す" });
   await expect(dialog).toBeVisible();
   const distance = dialog.getByLabel("押し出し量");
+  await expect(page.getByText("モデリングプレビュー")).toBeVisible();
+  await expect(page.getByTestId("viewport-canvas")).toHaveAttribute(
+    "data-modeling-preview",
+    "true",
+  );
   await distance.fill("2");
   await expect(page.getByText("面: 1")).toBeVisible();
   await dialog.getByRole("button", { name: "キャンセル" }).click();
   await expect(dialog).toHaveCount(0);
+  await expect(page.getByText("モデリングプレビュー")).toHaveCount(0);
   await expect(page.getByText("面: 1")).toBeVisible();
 
   await page.getByRole("button", { name: "押し出し" }).click();

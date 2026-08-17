@@ -35,6 +35,8 @@ export interface ViewportCanvasProps {
   onPickRegion(items: readonly SelectionItem[], additive: boolean): void;
   axisConstraint: AxisConstraint;
   snapSettings: SnapSettings;
+  modelingPreviewActive: boolean;
+  geometryEpoch: number;
 }
 
 export function ViewportCanvas({
@@ -53,6 +55,8 @@ export function ViewportCanvas({
   onPickRegion,
   axisConstraint,
   snapSettings,
+  modelingPreviewActive,
+  geometryEpoch,
 }: ViewportCanvasProps) {
   const hostRef = useRef<HTMLDivElement>(null);
   const viewportRef = useRef<Viewport>(null);
@@ -85,8 +89,16 @@ export function ViewportCanvas({
         selectionModes,
         selectionItems,
         displayLayers,
+        geometryEpoch,
       ),
-    [displayLayers, objects, selectedObjectIds, selectionItems, selectionModes],
+    [
+      displayLayers,
+      geometryEpoch,
+      objects,
+      selectedObjectIds,
+      selectionItems,
+      selectionModes,
+    ],
   );
   useEffect(
     () => viewportRef.current?.setAxisConstraint(axisConstraint),
@@ -106,10 +118,10 @@ export function ViewportCanvas({
   );
   useEffect(
     () =>
-      viewportRef.current?.setRegionSelectionActive(
-        selectionGesture !== "click",
+      viewportRef.current?.setTransformInteractionBlocked(
+        selectionGesture !== "click" || modelingPreviewActive,
       ),
-    [selectionGesture],
+    [modelingPreviewActive, selectionGesture],
   );
 
   return (
@@ -125,6 +137,7 @@ export function ViewportCanvas({
       data-axis-constraint={axisConstraint}
       data-grid-snap={snapSettings.grid}
       data-vertex-snap={snapSettings.vertex}
+      data-modeling-preview={modelingPreviewActive}
       tabIndex={0}
       onPointerDown={(event) => event.currentTarget.focus()}
       onPointerDownCapture={(event) => {

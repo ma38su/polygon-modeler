@@ -359,6 +359,19 @@ kbd {
   width: var(--icon-xs);
   height: var(--icon-xs);
 }
+.modeling-preview-badge {
+  position: absolute;
+  z-index: 3;
+  top: 126px;
+  left: 164px;
+  padding: var(--space-1-5) var(--space-2);
+  border: 1px solid color-mix(in srgb, var(--accent) 55%, var(--border));
+  border-radius: var(--radius-md);
+  color: var(--accent-strong);
+  background: color-mix(in srgb, var(--accent-muted), var(--surface-1) 40%);
+  font-size: var(--font-size-xs);
+  pointer-events: none;
+}
 .selection-mode-bar button {
   min-height: var(--control-sm);
   padding: 0 var(--space-2);

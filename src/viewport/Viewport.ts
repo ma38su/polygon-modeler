@@ -103,7 +103,7 @@ export class Viewport {
   #transformMode: TransformMode = "translate";
   #axisConstraint: AxisConstraint = "all";
   #snapSettings: SnapSettings = { grid: false, vertex: false, gridSize: 0.5 };
-  #regionSelectionActive = false;
+  #transformInteractionBlocked = false;
   #transformCommitListener?: TransformCommitListener;
   #elementTransformCommitListener?: ElementTransformCommitListener;
   #selectedObjectId?: ObjectId;
@@ -189,12 +189,14 @@ export class Viewport {
     selectionModes: ReadonlySet<SelectionMode>,
     selectionItems: readonly SelectionItem[],
     displayLayers: DisplayLayers,
+    geometryEpoch = 0,
   ): void {
     this.#geometryAdapter.sync(
       objects,
       selectedIds,
       selectionItems,
       displayLayers,
+      geometryEpoch,
     );
     this.#objects = objects;
     this.#selectionModes = selectionModes;
@@ -246,9 +248,9 @@ export class Viewport {
     );
   }
 
-  setRegionSelectionActive(active: boolean): void {
-    if (this.#regionSelectionActive === active) return;
-    this.#regionSelectionActive = active;
+  setTransformInteractionBlocked(blocked: boolean): void {
+    if (this.#transformInteractionBlocked === blocked) return;
+    this.#transformInteractionBlocked = blocked;
     this.#attachSelectedObject();
   }
 
@@ -385,7 +387,7 @@ export class Viewport {
 
   #attachSelectedObject(): void {
     if (!this.#transformControls) return;
-    if (this.#regionSelectionActive) {
+    if (this.#transformInteractionBlocked) {
       this.#transformControls.detach();
       return;
     }

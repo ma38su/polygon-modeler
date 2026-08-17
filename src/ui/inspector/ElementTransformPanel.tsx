@@ -1,5 +1,6 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import type { Editor } from "../../editor/Editor";
+import type { ModelObjectSnapshot } from "../../editor/document/types";
 import {
   Combine,
   FlipVertical2,
@@ -11,9 +12,11 @@ type Values = { x: number; y: number; z: number };
 export function ElementTransformPanel({
   editor,
   onError,
+  onPreview,
 }: {
   editor: Editor;
   onError(message: string): void;
+  onPreview(objects?: readonly ModelObjectSnapshot[]): void;
 }) {
   const [move, setMove] = useState<Values>({ x: 0, y: 0, z: 0 });
   const [rotate, setRotate] = useState<Values>({ x: 0, y: 0, z: 0 });
@@ -28,9 +31,19 @@ export function ElementTransformPanel({
     }
   };
   const closeExtrudeDialog = () => {
+    onPreview(undefined);
     setShowExtrudeDialog(false);
     setExtrudeDistance(1);
   };
+  const previewExtrusion = (distance: number) => {
+    try {
+      onPreview(editor.previewExtrudeSelectedFaces(distance));
+    } catch (error) {
+      onPreview(undefined);
+      onError(error instanceof Error ? error.message : String(error));
+    }
+  };
+  useEffect(() => () => onPreview(undefined), [onPreview]);
   const applyExtrusion = () => {
     try {
       editor.extrudeSelectedFaces(extrudeDistance);
@@ -94,7 +107,13 @@ export function ElementTransformPanel({
       </fieldset>
       <fieldset className="modeling-actions">
         <legend>モデリング</legend>
-        <button type="button" onClick={() => setShowExtrudeDialog(true)}>
+        <button
+          type="button"
+          onClick={() => {
+            setShowExtrudeDialog(true);
+            previewExtrusion(extrudeDistance);
+          }}
+        >
           <Layers3 aria-hidden="true" />
           押し出し
         </button>
@@ -150,9 +169,11 @@ export function ElementTransformPanel({
                 type="number"
                 step="0.1"
                 value={extrudeDistance}
-                onChange={(event) =>
-                  setExtrudeDistance(Number(event.currentTarget.value))
-                }
+                onChange={(event) => {
+                  const distance = Number(event.currentTarget.value);
+                  setExtrudeDistance(distance);
+                  if (Number.isFinite(distance)) previewExtrusion(distance);
+                }}
                 onKeyDown={(event) => {
                   if (event.key === "Enter") applyExtrusion();
                 }}

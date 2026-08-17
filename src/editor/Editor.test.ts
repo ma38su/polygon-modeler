@@ -142,6 +142,21 @@ describe("Editor", () => {
       [-1, -1, -1],
     );
   });
+  it("previews extrusion without changing the document or history", () => {
+    const editor = new Editor();
+    const objectId = editor.createPlane();
+    editor.setSelectionMode("face");
+    const faceId = editor.getSnapshot().objects[0]!.mesh.faceIds[0]!;
+    editor.selectElement({ objectId, elementId: faceId });
+    const before = editor.getSnapshot();
+
+    const preview = editor.previewExtrudeSelectedFaces(2);
+
+    expect(preview[0]!.mesh.faces).toHaveLength(5);
+    expect(editor.getSnapshot().objects[0]!.mesh.faces).toHaveLength(1);
+    expect(editor.getSnapshot().revision).toBe(before.revision);
+    expect(editor.getSnapshot().canUndo).toBe(before.canUndo);
+  });
   it("converts gizmo movement from world space into object-local space", () => {
     const editor = new Editor();
     const objectId = editor.createBox();

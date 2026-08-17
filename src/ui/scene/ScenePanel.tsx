@@ -8,9 +8,15 @@ interface ScenePanelProps {
   editor: Editor;
   snapshot: EditorSnapshot;
   onError(message: string): void;
+  onModelingPreview(objects?: EditorSnapshot["objects"]): void;
 }
 
-export function ScenePanel({ editor, snapshot, onError }: ScenePanelProps) {
+export function ScenePanel({
+  editor,
+  snapshot,
+  onError,
+  onModelingPreview,
+}: ScenePanelProps) {
   const selectedObject = snapshot.objects.find((object) =>
     snapshot.selectedObjectIds.has(object.id),
   );
@@ -63,7 +69,11 @@ export function ScenePanel({ editor, snapshot, onError }: ScenePanelProps) {
       <section aria-labelledby="inspector-title">
         <h2 id="inspector-title">インスペクター</h2>
         {snapshot.selectionItems.length ? (
-          <ElementTransformPanel editor={editor} onError={onError} />
+          <ElementTransformPanel
+            editor={editor}
+            onError={onError}
+            onPreview={onModelingPreview}
+          />
         ) : selectedObject ? (
           <TransformInspector editor={editor} object={selectedObject} />
         ) : (

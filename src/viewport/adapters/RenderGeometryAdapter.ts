@@ -30,27 +30,29 @@ const VERTEX_RADIUS = 0.025;
 export class RenderGeometryAdapter {
   readonly group = new Group();
   readonly #meshes = new Map<ObjectId, Mesh>();
-  readonly #meshRevisions = new Map<ObjectId, number>();
+  readonly #meshRevisions = new Map<ObjectId, string>();
   sync(
     objects: readonly ModelObjectSnapshot[],
     selectedIds: ReadonlySet<ObjectId>,
     selectionItems: readonly SelectionItem[] = [],
     displayLayers: DisplayLayers = DEFAULT_DISPLAY_LAYERS,
+    geometryEpoch = 0,
   ): void {
     const liveIds = new Set(objects.map((object) => object.id));
     for (const [id, mesh] of this.#meshes)
       if (!liveIds.has(id)) this.#remove(id, mesh);
     for (const object of objects) {
+      const geometryRevision = `${geometryEpoch}:${object.mesh.revision}`;
       let mesh = this.#meshes.get(object.id);
       if (!mesh) {
         mesh = this.#createMesh(object);
         this.#meshes.set(object.id, mesh);
         this.group.add(mesh);
-        this.#meshRevisions.set(object.id, object.mesh.revision);
-      } else if (this.#meshRevisions.get(object.id) !== object.mesh.revision) {
+        this.#meshRevisions.set(object.id, geometryRevision);
+      } else if (this.#meshRevisions.get(object.id) !== geometryRevision) {
         mesh.geometry.dispose();
         mesh.geometry = this.#createGeometry(object);
-        this.#meshRevisions.set(object.id, object.mesh.revision);
+        this.#meshRevisions.set(object.id, geometryRevision);
       }
       mesh.name = object.name;
       mesh.visible = object.visible;
