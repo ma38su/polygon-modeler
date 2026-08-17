@@ -1,7 +1,10 @@
 import type { EdgeId, FaceId, VertexId } from "../document/types";
 import type { EditableMesh } from "../mesh/EditableMesh";
 import type { SelectionItem } from "./SelectionManager";
-export { collectQuadEdgeLoop as selectQuadEdgeLoop } from "../mesh/edgeLoop";
+export {
+  collectEdgeLoop as selectEdgeLoop,
+  collectQuadEdgeRing as selectEdgeRing,
+} from "../mesh/edgeLoop";
 
 export type AdjacencySelectionOperation = "grow" | "shrink" | "connected";
 

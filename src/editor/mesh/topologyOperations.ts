@@ -1,6 +1,6 @@
 import { EditableMesh } from "./EditableMesh";
 import type { EdgeId, FaceId, Vector3Value, VertexId } from "../document/types";
-import { collectQuadEdgeLoop, edgePairKey } from "./edgeLoop";
+import { collectQuadEdgeRing, edgePairKey } from "./edgeLoop";
 
 const vector = (positions: readonly number[], index: number): Vector3Value => ({
   x: positions[index * 3]!,
@@ -221,7 +221,7 @@ export function loopCut(
 ): EditableMesh {
   if (!Number.isFinite(factor) || factor <= 0 || factor >= 1)
     throw new Error("ループカット位置は0より大きく1未満で指定してください。");
-  const loop = new Set(collectQuadEdgeLoop(mesh, edgeIds));
+  const loop = new Set(collectQuadEdgeRing(mesh, edgeIds));
   if (!loop.size) return mesh.clone();
   const data = mesh.toMeshData();
   const positions = [...data.positions];

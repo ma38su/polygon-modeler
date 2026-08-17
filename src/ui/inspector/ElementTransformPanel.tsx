@@ -201,6 +201,10 @@ export function ElementTransformPanel({
           <Waypoints aria-hidden="true" />
           ループ
         </button>
+        <button type="button" onClick={() => editor.selectEdgeRing()}>
+          <BetweenHorizontalEnd aria-hidden="true" />
+          リング
+        </button>
       </fieldset>
       <fieldset>
         <legend>相対移動</legend>

@@ -213,13 +213,13 @@ describe("Editor", () => {
     editor.selectConnected();
     expect(editor.getSnapshot().selectionItems).toHaveLength(8);
   });
-  it("selects the opposite-edge loop across quad faces", () => {
+  it("selects an opposite-edge ring across quad faces", () => {
     const editor = new Editor();
     const objectId = editor.createBox();
     editor.setSelectionMode("edge");
     const edgeId = editor.getSnapshot().objects[0]!.mesh.edges[0]!.id;
     editor.selectElement({ objectId, elementId: edgeId });
-    editor.selectEdgeLoop();
+    editor.selectEdgeRing();
     expect(editor.getSnapshot().selectionItems).toHaveLength(4);
   });
   it("loop cuts selected quad edge rings as one undoable operation", () => {

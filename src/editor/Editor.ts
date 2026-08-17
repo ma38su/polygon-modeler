@@ -32,7 +32,8 @@ import type { EditorCommand } from "./commands/EditorCommand";
 import type { SelectionSnapshot } from "./selection/SelectionManager";
 import {
   changeSelectionByAdjacency,
-  selectQuadEdgeLoop,
+  selectEdgeLoop as collectSelectedEdgeLoop,
+  selectEdgeRing as collectSelectedEdgeRing,
   type AdjacencySelectionOperation,
 } from "./selection/topologySelection";
 import {
@@ -391,6 +392,14 @@ export class Editor {
     this.#changeSelectionByAdjacency("connected");
   }
   selectEdgeLoop(): void {
+    this.#selectEdgePath(collectSelectedEdgeLoop);
+  }
+  selectEdgeRing(): void {
+    this.#selectEdgePath(collectSelectedEdgeRing);
+  }
+  #selectEdgePath(
+    collect: (mesh: EditableMesh, selected: ReadonlySet<EdgeId>) => EdgeId[],
+  ): void {
     const result = [...this.selection.items];
     for (const objectId of new Set(result.map((item) => item.objectId))) {
       const object = this.document.getObject(objectId);
@@ -405,7 +414,7 @@ export class Editor {
           .map((item) => item.elementId as EdgeId),
       );
       result.push(
-        ...selectQuadEdgeLoop(object.mesh, selected).map((elementId) => ({
+        ...collect(object.mesh, selected).map((elementId) => ({
           objectId,
           elementId,
         })),
