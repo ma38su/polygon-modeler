@@ -332,10 +332,47 @@ export function knifeFace(
   const target = data.faces[faceIndex]!;
   if (target.length < 4)
     throw new Error("Knifeには4頂点以上のFaceを選択してください。");
-  const firstEdge = 0;
-  const secondEdge = Math.floor(target.length / 2);
+  return knifeFaceBetweenEdges(
+    mesh,
+    faceId,
+    { edgeIndex: 0, factor },
+    {
+      edgeIndex: Math.floor(target.length / 2),
+      factor,
+    },
+  );
+}
+
+export interface KnifeCutPoint {
+  readonly edgeIndex: number;
+  readonly factor: number;
+}
+
+export function knifeFaceBetweenEdges(
+  mesh: EditableMesh,
+  faceId: FaceId,
+  firstPoint: KnifeCutPoint,
+  secondPoint: KnifeCutPoint,
+): EditableMesh {
+  const data = mesh.toMeshData();
+  const faceIndex = data.faceIds.indexOf(faceId);
+  if (faceIndex < 0) return mesh.clone();
+  const target = data.faces[faceIndex]!;
+  for (const point of [firstPoint, secondPoint]) {
+    if (
+      !Number.isInteger(point.edgeIndex) ||
+      point.edgeIndex < 0 ||
+      point.edgeIndex >= target.length ||
+      !Number.isFinite(point.factor) ||
+      point.factor <= 0 ||
+      point.factor >= 1
+    )
+      throw new Error("Knife位置がFace境界の範囲外です。");
+  }
+  if (firstPoint.edgeIndex === secondPoint.edgeIndex)
+    throw new Error("Knifeの2点は異なる辺上に指定してください。");
   const positions = [...data.positions];
-  const cutIndices = [firstEdge, secondEdge].map((edgeIndex) => {
+  const cutIndices = [firstPoint, secondPoint].map(({ edgeIndex, factor }) => {
     const from = target[edgeIndex]!;
     const to = target[(edgeIndex + 1) % target.length]!;
     const fromPoint = vector(data.positions, from);

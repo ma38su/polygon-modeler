@@ -396,7 +396,9 @@ describe("Editor", () => {
     expect(editor.getSnapshot().objects[0]!.mesh.faces).toHaveLength(1);
     expect(editor.getSnapshot().selectionItems[0]?.elementId).toBe(faceId);
     editor.redo();
-    expect(editor.getSnapshot().objects[0]!.mesh).toEqual(extruded);
+    const redone = editor.getSnapshot().objects[0]!.mesh;
+    expect({ ...redone, revision: 0 }).toEqual({ ...extruded, revision: 0 });
+    expect(redone.revision).toBeGreaterThan(extruded.revision);
   });
   it("loads a project cleanly and starts a new undo history", () => {
     const sourceEditor = new Editor();

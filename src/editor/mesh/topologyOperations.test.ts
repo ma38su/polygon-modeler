@@ -8,6 +8,7 @@ import {
   insetFaces,
   loopCut,
   knifeFace,
+  knifeFaceBetweenEdges,
   mergeVertices,
   splitEdge,
   splitFace,
@@ -76,6 +77,19 @@ describe("topology operations", () => {
     const result = knifeFace(mesh, faceId, 0.5);
     expect(result.vertices.size).toBe(10);
     expect(result.faces.size).toBe(7);
+    expect(validateMesh(result).valid).toBe(true);
+  });
+  it("knifes between arbitrary boundary points selected in the viewport", () => {
+    const mesh = createPlaneMesh();
+    const faceId = [...mesh.faces.keys()][0]!;
+    const result = knifeFaceBetweenEdges(
+      mesh,
+      faceId,
+      { edgeIndex: 0, factor: 0.25 },
+      { edgeIndex: 2, factor: 0.75 },
+    );
+    expect(result.vertices.size).toBe(6);
+    expect(result.faces.size).toBe(2);
     expect(validateMesh(result).valid).toBe(true);
   });
   it("splits a face into triangles", () => {

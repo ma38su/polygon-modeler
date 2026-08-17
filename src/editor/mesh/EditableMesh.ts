@@ -6,6 +6,7 @@ import type {
   Vector3Value,
   VertexId,
 } from "../document/types";
+import type { EntityPatch, MeshPatch } from "./meshPatch";
 export interface MeshVertex {
   readonly id: VertexId;
   position: Vector3Value;
@@ -140,6 +141,25 @@ export class EditableMesh {
     this.#nextEdge = source.#nextEdge;
     this.#nextFace = source.#nextFace;
     this.#revision = source.#revision + 1;
+  }
+  applyPatch(patch: MeshPatch): void {
+    applyEntityPatch(this.vertices, patch.vertices, cloneVertex);
+    applyEntityPatch(this.halfEdges, patch.halfEdges, (value) => ({
+      ...value,
+    }));
+    applyEntityPatch(this.edges, patch.edges, (value) => ({
+      ...value,
+      halfEdges: [...value.halfEdges],
+    }));
+    applyEntityPatch(this.faces, patch.faces, (value) => ({
+      ...value,
+      vertices: [...value.vertices],
+    }));
+    this.#nextVertex = patch.nextIds.vertex;
+    this.#nextHalfEdge = patch.nextIds.halfEdge;
+    this.#nextEdge = patch.nextIds.edge;
+    this.#nextFace = patch.nextIds.face;
+    this.#revision += 1;
   }
   transformVertices(
     ids: ReadonlySet<VertexId>,
@@ -311,3 +331,19 @@ export class EditableMesh {
     return `${prefix}-${sequence}`;
   }
 }
+
+function applyEntityPatch<T extends { readonly id: string }>(
+  target: Map<T["id"], T>,
+  patch: readonly EntityPatch<T>[],
+  clone: (value: T) => T,
+): void {
+  for (const change of patch) {
+    if (change.value) target.set(change.id, clone(change.value));
+    else target.delete(change.id);
+  }
+}
+
+const cloneVertex = (value: MeshVertex): MeshVertex => ({
+  ...value,
+  position: { ...value.position },
+});

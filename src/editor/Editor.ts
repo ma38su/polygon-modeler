@@ -47,6 +47,8 @@ import {
   mergeVertices,
   loopCut,
   knifeFace,
+  knifeFaceBetweenEdges,
+  type KnifeCutPoint,
   splitEdge,
   splitFace,
 } from "./mesh/topologyOperations";
@@ -66,6 +68,9 @@ import {
   evaluateBoolean,
   type BooleanOperation,
 } from "./boolean/booleanOperations";
+import type { TransformOrientation } from "../viewport/transform/elementSelection";
+import type { TransformMode } from "../viewport/Viewport";
+import { numericElementTransformUpdates } from "./transform/numericElementTransform";
 type Listener = () => void;
 const clampUnit = (value: number) => Math.min(1, Math.max(0, value));
 export class Editor {
@@ -532,6 +537,54 @@ export class Editor {
       this.#commit(true);
     }
   }
+  transformSelectedInFrame(
+    mode: TransformMode,
+    values: Vector3Value,
+    orientation: TransformOrientation,
+  ): void {
+    const labels = {
+      translate: "要素を移動",
+      rotate: "要素を回転",
+      scale: "要素を拡大縮小",
+    } as const;
+    this.applyElementTransform(
+      labels[mode],
+      numericElementTransformUpdates(
+        this.document.toSnapshot(),
+        this.selection.items,
+        mode,
+        values,
+        orientation,
+      ),
+    );
+  }
+  previewTransformSelectedInFrame(
+    mode: TransformMode,
+    values: Vector3Value,
+    orientation: TransformOrientation,
+  ): readonly ModelObjectSnapshot[] {
+    const updates = numericElementTransformUpdates(
+      this.document.toSnapshot(),
+      this.selection.items,
+      mode,
+      values,
+      orientation,
+    );
+    const meshes = new Map<ObjectId, EditableMesh>();
+    for (const update of updates) {
+      const object = this.document.getObject(update.objectId);
+      if (!object) continue;
+      const mesh = object.mesh.clone();
+      mesh.setVertexPositions(
+        new Map(update.vertices.map((vertex) => [vertex.id, vertex.position])),
+      );
+      meshes.set(update.objectId, mesh);
+    }
+    return this.document.toSnapshot().map((object) => {
+      const mesh = meshes.get(object.id);
+      return mesh ? { ...object, mesh: mesh.toMeshData() } : object;
+    });
+  }
   #translateSelected(
     deltaForObject: (objectId: ObjectId) => Vector3Value,
   ): void {
@@ -778,6 +831,18 @@ export class Editor {
         ? knifeFace(mesh, face.elementId as FaceId, factor)
         : mesh.clone();
     });
+  }
+  knifeFaceAtPoints(
+    objectId: ObjectId,
+    faceId: FaceId,
+    first: KnifeCutPoint,
+    second: KnifeCutPoint,
+  ): void {
+    this.#applyTopology("Knife", (mesh, items) =>
+      items.some((item) => item.objectId === objectId) && mesh.faces.has(faceId)
+        ? knifeFaceBetweenEdges(mesh, faceId, first, second)
+        : mesh.clone(),
+    );
   }
   previewKnifeSelectedFace(factor = 0.5): readonly ModelObjectSnapshot[] {
     return this.#previewTopology((mesh, items) => {
