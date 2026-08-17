@@ -1,4 +1,4 @@
-import { Box, Eye, EyeOff } from "lucide-react";
+import { Box, Combine, Copy, Eye, EyeOff } from "lucide-react";
 import type { Editor } from "../../editor/Editor";
 import type { EditorSnapshot } from "../../editor/document/types";
 import { ElementTransformPanel } from "../inspector/ElementTransformPanel";
@@ -42,7 +42,9 @@ export function ScenePanel({
                 <button
                   type="button"
                   className="object-select"
-                  onClick={() => editor.selectObject(object.id)}
+                  onClick={(event) =>
+                    editor.selectObject(object.id, event.shiftKey)
+                  }
                 >
                   <Box aria-hidden="true" />
                   {object.name}
@@ -65,6 +67,24 @@ export function ScenePanel({
             ))}
           </ul>
         )}
+        <div className="object-actions">
+          <button
+            type="button"
+            disabled={snapshot.selectedObjectIds.size === 0}
+            onClick={() => editor.duplicateSelectedObjects()}
+          >
+            <Copy aria-hidden="true" />
+            複製
+          </button>
+          <button
+            type="button"
+            disabled={snapshot.selectedObjectIds.size < 2}
+            onClick={() => editor.joinSelectedObjects()}
+          >
+            <Combine aria-hidden="true" />
+            結合
+          </button>
+        </div>
       </section>
       <section aria-labelledby="inspector-title">
         <h2 id="inspector-title">インスペクター</h2>

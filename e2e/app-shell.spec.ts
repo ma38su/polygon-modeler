@@ -252,6 +252,27 @@ test("previews numeric element transforms before applying", async ({
   await expect(page.getByRole("button", { name: "やり直す" })).toBeEnabled();
 });
 
+test("duplicates and joins objects from the outliner", async ({ page }) => {
+  await page.goto("/?renderer=webgl2");
+  await page.getByRole("button", { name: "Box追加" }).click();
+  await page.getByRole("button", { name: "複製" }).click();
+  await expect(
+    page.getByRole("button", { name: "Box 1 Copy", exact: true }),
+  ).toBeVisible();
+  await page
+    .getByRole("button", { name: "Box 1", exact: true })
+    .click({ modifiers: ["Shift"] });
+  await page.getByRole("button", { name: "結合" }).click();
+  await expect(
+    page.getByRole("button", { name: /^Joined \d+$/ }),
+  ).toBeVisible();
+  await expect(page.getByText("面: 12")).toBeVisible();
+  await page.getByRole("button", { name: "元に戻す" }).click();
+  await expect(
+    page.getByRole("button", { name: "Box 1", exact: true }),
+  ).toBeVisible();
+});
+
 test("selects vertices with box and lasso gestures", async ({ page }) => {
   await page.goto("/?renderer=webgl2");
   await page.getByRole("button", { name: "Box追加" }).click();

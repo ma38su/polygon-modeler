@@ -13,6 +13,7 @@ import {
   Slice,
   SquareDashed,
   Waypoints,
+  Ungroup,
 } from "lucide-react";
 type Values = { x: number; y: number; z: number };
 type ModelingOperation = "extrude" | "inset" | "bevel";
@@ -273,6 +274,13 @@ export function ElementTransformPanel({
         >
           <FlipVertical2 aria-hidden="true" />
           面反転
+        </button>
+        <button
+          type="button"
+          onClick={() => run(() => editor.separateSelectedFaces())}
+        >
+          <Ungroup aria-hidden="true" />
+          面を分離
         </button>
       </fieldset>
       {modelingOperation && (

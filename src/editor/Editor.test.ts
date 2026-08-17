@@ -306,4 +306,46 @@ describe("Editor", () => {
     expect(editor.getSnapshot().canUndo).toBe(true);
     expect(editor.getSnapshot().isDirty).toBe(true);
   });
+  it("duplicates and joins multiple outliner objects with undo", () => {
+    const editor = new Editor();
+    const first = editor.createBox();
+    editor.duplicateSelectedObjects();
+    expect(editor.getSnapshot().objects).toHaveLength(2);
+    editor.undo();
+    expect(editor.getSnapshot().objects).toHaveLength(1);
+    editor.redo();
+    const second = editor.getSnapshot().objects[1]!.id;
+    editor.transformObject(second, {
+      position: { x: 4, y: 0, z: 0 },
+      rotation: { x: 0, y: 0, z: 0 },
+      scale: { x: 1, y: 1, z: 1 },
+    });
+    editor.selectObject(first);
+    editor.selectObject(second, true);
+    editor.joinSelectedObjects();
+    expect(editor.getSnapshot().objects).toHaveLength(1);
+    expect(editor.getSnapshot().objects[0]!.mesh.faces).toHaveLength(12);
+    expect(Math.max(...editor.getSnapshot().objects[0]!.mesh.positions)).toBe(
+      5,
+    );
+    editor.undo();
+    expect(editor.getSnapshot().objects).toHaveLength(2);
+  });
+  it("separates selected faces into a new object", () => {
+    const editor = new Editor();
+    const objectId = editor.createBox();
+    editor.setSelectionMode("face");
+    const faceId = editor.getSnapshot().objects[0]!.mesh.faceIds[0]!;
+    editor.selectElement({ objectId, elementId: faceId });
+    editor.separateSelectedFaces();
+    expect(
+      editor
+        .getSnapshot()
+        .objects.map((object) => object.mesh.faces.length)
+        .sort(),
+    ).toEqual([1, 5]);
+    editor.undo();
+    expect(editor.getSnapshot().objects).toHaveLength(1);
+    expect(editor.getSnapshot().objects[0]!.mesh.faces).toHaveLength(6);
+  });
 });

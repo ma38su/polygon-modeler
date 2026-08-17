@@ -47,6 +47,7 @@ import {
 } from "./mesh/topologyOperations";
 import { deserializeProject, serializeProject } from "./formats/projectFormat";
 import type { ImportedMesh } from "./formats/exchangeFormats";
+import { extractFaces, joinObjectMeshes } from "./mesh/objectOperations";
 type Listener = () => void;
 export class Editor {
   readonly document = new ModelDocument();
@@ -124,12 +125,98 @@ export class Editor {
     this.selection.clear();
     this.#commit(true);
   }
-  selectObject(id?: ObjectId): void {
+  selectObject(id?: ObjectId, additive = false): void {
     if (id && !this.document.getObject(id)) return;
-    this.#selectedObjectIds.clear();
-    if (id) this.#selectedObjectIds.add(id);
+    if (!additive) this.#selectedObjectIds.clear();
+    if (id && additive && this.#selectedObjectIds.has(id))
+      this.#selectedObjectIds.delete(id);
+    else if (id) this.#selectedObjectIds.add(id);
     this.selection.clear();
     this.#commit();
+  }
+  duplicateSelectedObjects(): void {
+    const sources = this.document
+      .objects()
+      .filter((object) => this.#selectedObjectIds.has(object.id));
+    if (!sources.length) return;
+    const copies = sources.map((source) => {
+      const sequence = this.#nextObjectId++;
+      const copy = new ModelObject(
+        `object-${sequence}` as ObjectId,
+        `${source.name} Copy`,
+        source.mesh.clone(),
+      );
+      copy.transform = structuredClone(source.transform);
+      copy.visible = source.visible;
+      return copy;
+    });
+    this.history.execute(
+      new CompositeCommand(
+        "オブジェクトを複製",
+        copies.map((copy) => new CreateObjectCommand(copy)),
+      ),
+      this.document,
+    );
+    this.#selectedObjectIds.clear();
+    copies.forEach((copy) => this.#selectedObjectIds.add(copy.id));
+    this.#commit(true);
+  }
+  joinSelectedObjects(): void {
+    const sources = this.document
+      .objects()
+      .filter((object) => this.#selectedObjectIds.has(object.id));
+    if (sources.length < 2) return;
+    const sequence = this.#nextObjectId++;
+    const joined = new ModelObject(
+      `object-${sequence}` as ObjectId,
+      `Joined ${sequence}`,
+      joinObjectMeshes(sources.map((object) => object.toSnapshot())),
+    );
+    this.history.execute(
+      new CompositeCommand("オブジェクトを結合", [
+        new DeleteObjectCommand(sources.map((source) => source.id)),
+        new CreateObjectCommand(joined),
+      ]),
+      this.document,
+    );
+    this.#selectedObjectIds.clear();
+    this.#selectedObjectIds.add(joined.id);
+    this.#commit(true);
+  }
+  separateSelectedFaces(): void {
+    const commands: EditorCommand[] = [];
+    const created: ModelObject[] = [];
+    for (const [objectId, items] of this.#selectionGroups()) {
+      const object = this.document.getObject(objectId);
+      if (!object) continue;
+      const faces = new Set(
+        items
+          .map((item) => item.elementId as FaceId)
+          .filter((id) => object.mesh.faces.has(id)),
+      );
+      if (!faces.size || faces.size === object.mesh.faces.size) continue;
+      const remaining = extractFaces(object.mesh, faces, false);
+      const separated = new ModelObject(
+        `object-${this.#nextObjectId++}` as ObjectId,
+        `${object.name} Separated`,
+        extractFaces(object.mesh, faces, true),
+      );
+      separated.transform = structuredClone(object.transform);
+      commands.push(
+        new EditMeshCommand("面を分離", objectId, object.mesh, remaining),
+        new CreateObjectCommand(separated),
+      );
+      created.push(separated);
+    }
+    if (!commands.length) return;
+    this.history.execute(
+      new CompositeCommand("面を分離", commands),
+      this.document,
+    );
+    this.selection.clear();
+    this.#selectedObjectIds.clear();
+    created.forEach((object) => this.#selectedObjectIds.add(object.id));
+    this.#commit(true);
   }
   setSelectionMode(mode: SelectionMode): void {
     if (!this.selection.setMode(mode)) return;

@@ -470,6 +470,16 @@ kbd {
   margin: 0;
   padding: 0;
 }
+.object-actions {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-1);
+  margin-top: var(--space-2);
+}
+.object-actions button {
+  min-width: 0;
+  justify-content: center;
+}
 .object-list li {
   display: flex;
   align-items: center;
