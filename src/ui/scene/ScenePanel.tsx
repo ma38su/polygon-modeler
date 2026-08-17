@@ -9,6 +9,7 @@ import {
   FlipHorizontal2,
   GitMerge,
   Minus,
+  RefreshCw,
 } from "lucide-react";
 import type { BooleanOperation } from "../../editor/boolean/booleanOperations";
 import type { Editor } from "../../editor/Editor";
@@ -31,12 +32,20 @@ export function ScenePanel({
   onModelingPreview,
 }: ScenePanelProps) {
   const [booleanPending, setBooleanPending] = useState(false);
+  const [mergeDistance, setMergeDistance] = useState(0.0001);
   const selectedObject = snapshot.objects.find((object) =>
     snapshot.selectedObjectIds.has(object.id),
   );
   const diagnostics = selectedObject
     ? diagnoseMesh(selectedObject.mesh)
     : undefined;
+  const runAction = (action: () => void) => {
+    try {
+      action();
+    } catch (error) {
+      onError(error instanceof Error ? error.message : String(error));
+    }
+  };
   const runBoolean = async (operation: BooleanOperation) => {
     setBooleanPending(true);
     try {
@@ -176,6 +185,41 @@ export function ScenePanel({
                   <dd>{diagnostics!.isolatedVertices}</dd>
                 </div>
               </dl>
+              <div className="mesh-repair-actions">
+                <label>
+                  <span>Merge距離</span>
+                  <input
+                    aria-label="Merge距離"
+                    type="number"
+                    min="0.000001"
+                    step="0.0001"
+                    value={mergeDistance}
+                    onChange={(event) =>
+                      setMergeDistance(Number(event.currentTarget.value))
+                    }
+                  />
+                </label>
+                <button
+                  type="button"
+                  onClick={() =>
+                    runAction(() =>
+                      editor.mergeSelectedObjectsByDistance(mergeDistance),
+                    )
+                  }
+                >
+                  <Combine aria-hidden="true" />
+                  Merge by Distance
+                </button>
+                <button
+                  type="button"
+                  onClick={() =>
+                    runAction(() => editor.recalculateSelectedObjectNormals())
+                  }
+                >
+                  <RefreshCw aria-hidden="true" />
+                  法線再計算
+                </button>
+              </div>
             </div>
           </>
         ) : (

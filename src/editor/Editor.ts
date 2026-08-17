@@ -55,6 +55,10 @@ import {
 } from "./mesh/objectOperations";
 import { moveElementsAlongNormals } from "./mesh/normalMovement";
 import {
+  mergeByDistance,
+  recalculateFaceNormals,
+} from "./mesh/repairOperations";
+import {
   evaluateBoolean,
   type BooleanOperation,
 } from "./boolean/booleanOperations";
@@ -218,6 +222,35 @@ export class Editor {
     );
     this.#selectedObjectIds.clear();
     this.#selectedObjectIds.add(joined.id);
+    this.#commit(true);
+  }
+  mergeSelectedObjectsByDistance(distance: number): void {
+    this.#repairSelectedObjects("距離で頂点を結合", (mesh) =>
+      mergeByDistance(mesh, distance),
+    );
+  }
+  recalculateSelectedObjectNormals(): void {
+    this.#repairSelectedObjects("面法線を再計算", recalculateFaceNormals);
+  }
+  #repairSelectedObjects(
+    label: string,
+    repair: (mesh: EditableMesh) => EditableMesh,
+  ): void {
+    const commands = this.document
+      .objects()
+      .filter((object) => this.#selectedObjectIds.has(object.id))
+      .map(
+        (object) =>
+          new EditMeshCommand(
+            label,
+            object.id,
+            object.mesh,
+            repair(object.mesh),
+          ),
+      );
+    if (!commands.length) return;
+    this.history.execute(new CompositeCommand(label, commands), this.document);
+    this.selection.clear();
     this.#commit(true);
   }
   async booleanSelectedObjects(operation: BooleanOperation): Promise<void> {

@@ -294,6 +294,15 @@ describe("Editor", () => {
       "閉じた立体",
     );
   });
+  it("repairs selected object normals as an undoable mesh edit", () => {
+    const editor = new Editor();
+    editor.createBox();
+    const before = editor.getSnapshot().objects[0]!.mesh.faces;
+    editor.recalculateSelectedObjectNormals();
+    expect(editor.getSnapshot().canUndo).toBe(true);
+    editor.undo();
+    expect(editor.getSnapshot().objects[0]!.mesh.faces).toEqual(before);
+  });
   it("converts gizmo movement from world space into object-local space", () => {
     const editor = new Editor();
     const objectId = editor.createBox();

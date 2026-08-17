@@ -58,6 +58,9 @@ test("shows the empty editor shell", async ({ page }) => {
   await expect(page.getByText("頂点: 8")).toBeVisible();
   await expect(page.getByText("面: 6")).toBeVisible();
   await expect(page.getByLabel("メッシュ診断")).toContainText("境界Edge0");
+  await page.getByRole("button", { name: "法線再計算" }).click();
+  await expect(page.getByRole("button", { name: "元に戻す" })).toBeEnabled();
+  await page.getByRole("button", { name: "元に戻す" }).click();
   const displayLayers = page.getByLabel("表示レイヤー");
   await expect(
     displayLayers.getByRole("button", { name: "Vertex" }),

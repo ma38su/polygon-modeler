@@ -361,6 +361,36 @@ kbd {
   color: var(--text-primary);
   font-variant-numeric: tabular-nums;
 }
+.mesh-repair-actions {
+  display: grid;
+  gap: var(--space-2);
+  margin-top: var(--space-3);
+}
+.mesh-repair-actions label {
+  display: grid;
+  grid-template-columns: 1fr minmax(72px, 1fr);
+  align-items: center;
+  gap: var(--space-2);
+  color: var(--text-muted);
+}
+.mesh-repair-actions input,
+.mesh-repair-actions button {
+  min-height: var(--control-sm);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  color: var(--text-primary);
+  background: var(--surface-2);
+}
+.mesh-repair-actions button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-1);
+}
+.mesh-repair-actions svg {
+  width: var(--icon-xs);
+  height: var(--icon-xs);
+}
 .snap-toolbar > span {
   padding-left: var(--space-1-5);
   color: var(--text-subtle);
