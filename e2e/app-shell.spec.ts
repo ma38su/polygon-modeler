@@ -244,6 +244,25 @@ test("previews and commits a face inset dialog", async ({ page }) => {
   await expect(page.getByText("面: 1")).toBeVisible();
 });
 
+test("previews and commits a Knife face cut", async ({ page }) => {
+  await page.goto("/?renderer=webgl2");
+  await page.getByRole("button", { name: "Plane追加" }).click();
+  const selectionModes = page.getByLabel("選択モード");
+  await selectionModes.getByRole("button", { name: "Vertex" }).click();
+  await selectionModes.getByRole("button", { name: "Edge" }).click();
+  await page.keyboard.press("ControlOrMeta+A");
+  await page.getByRole("button", { name: "Knife" }).click();
+  const dialog = page.getByRole("dialog", { name: "Knifeで面を切断" });
+  await expect(dialog).toBeVisible();
+  await dialog.getByLabel("辺上の位置").fill("0.35");
+  await expect(page.getByText("モデリングプレビュー")).toBeVisible();
+  await dialog.getByRole("button", { name: "切断" }).click();
+  await expect(page.getByText("頂点: 6")).toBeVisible();
+  await expect(page.getByText("面: 2")).toBeVisible();
+  await page.getByRole("button", { name: "元に戻す" }).click();
+  await expect(page.getByText("頂点: 4")).toBeVisible();
+});
+
 test("previews numeric element transforms before applying", async ({
   page,
 }) => {

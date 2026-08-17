@@ -44,6 +44,7 @@ import {
   flipFaces,
   mergeVertices,
   loopCut,
+  knifeFace,
   splitEdge,
   splitFace,
 } from "./mesh/topologyOperations";
@@ -734,6 +735,26 @@ export class Editor {
         mesh.edges.has(item.elementId as EdgeId),
       );
       return edge ? splitEdge(mesh, edge.elementId as EdgeId) : mesh.clone();
+    });
+  }
+  knifeSelectedFace(factor = 0.5): void {
+    this.#applyTopology("Knife", (mesh, items) => {
+      const face = items.find((item) =>
+        mesh.faces.has(item.elementId as FaceId),
+      );
+      return face
+        ? knifeFace(mesh, face.elementId as FaceId, factor)
+        : mesh.clone();
+    });
+  }
+  previewKnifeSelectedFace(factor = 0.5): readonly ModelObjectSnapshot[] {
+    return this.#previewTopology((mesh, items) => {
+      const face = items.find((item) =>
+        mesh.faces.has(item.elementId as FaceId),
+      );
+      return face
+        ? knifeFace(mesh, face.elementId as FaceId, factor)
+        : mesh.clone();
     });
   }
   loopCutSelectedEdges(factor = 0.5): void {

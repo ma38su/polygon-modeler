@@ -233,6 +233,19 @@ describe("Editor", () => {
     editor.undo();
     expect(editor.getSnapshot().objects[0]!.mesh.faces).toHaveLength(6);
   });
+  it("previews and commits a Knife face cut", () => {
+    const editor = new Editor();
+    const objectId = editor.createBox();
+    editor.setSelectionMode("face");
+    const faceId = editor.getSnapshot().objects[0]!.mesh.faceIds[0]!;
+    editor.selectElement({ objectId, elementId: faceId });
+    expect(editor.previewKnifeSelectedFace(0.4)[0]!.mesh.faces).toHaveLength(7);
+    expect(editor.getSnapshot().objects[0]!.mesh.faces).toHaveLength(6);
+    editor.knifeSelectedFace(0.4);
+    expect(editor.getSnapshot().objects[0]!.mesh.faces).toHaveLength(7);
+    editor.undo();
+    expect(editor.getSnapshot().objects[0]!.mesh.faces).toHaveLength(6);
+  });
   it("previews and commits face normal movement", () => {
     const editor = new Editor();
     const objectId = editor.createPlane();

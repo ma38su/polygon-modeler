@@ -7,6 +7,7 @@ import {
   flipFaces,
   insetFaces,
   loopCut,
+  knifeFace,
   mergeVertices,
   splitEdge,
   splitFace,
@@ -67,6 +68,14 @@ describe("topology operations", () => {
     const result = loopCut(mesh, new Set([[...mesh.edges.keys()][0]!]), 0.5);
     expect(result.vertices.size).toBe(12);
     expect(result.faces.size).toBe(10);
+    expect(validateMesh(result).valid).toBe(true);
+  });
+  it("knifes a face and inserts its cut points into adjacent faces", () => {
+    const mesh = createBoxMesh();
+    const faceId = [...mesh.faces.keys()][0]!;
+    const result = knifeFace(mesh, faceId, 0.5);
+    expect(result.vertices.size).toBe(10);
+    expect(result.faces.size).toBe(7);
     expect(validateMesh(result).valid).toBe(true);
   });
   it("splits a face into triangles", () => {

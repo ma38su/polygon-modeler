@@ -18,7 +18,7 @@ import {
   Ungroup,
 } from "lucide-react";
 type Values = { x: number; y: number; z: number };
-type ModelingOperation = "extrude" | "inset" | "bevel" | "normalMove";
+type ModelingOperation = "extrude" | "inset" | "bevel" | "normalMove" | "knife";
 type ModelingOperationConfig = {
   title: string;
   description: string;
@@ -67,6 +67,16 @@ const modelingOperations: Record<ModelingOperation, ModelingOperationConfig> = {
     defaultValue: 0.25,
     step: 0.05,
   },
+  knife: {
+    title: "Knifeで面を切断",
+    description: "選択Faceの向かい合う境界Edge上を結ぶ切断Edgeを作成します。",
+    label: "辺上の位置",
+    confirm: "切断",
+    defaultValue: 0.5,
+    step: 0.05,
+    min: 0.01,
+    max: 0.99,
+  },
 };
 export function ElementTransformPanel({
   editor,
@@ -103,7 +113,9 @@ export function ElementTransformPanel({
             ? editor.previewInsetSelectedFaces(value)
             : operation === "bevel"
               ? editor.previewBevelSelectedElements(value)
-              : editor.previewMoveSelectedAlongNormals(value),
+              : operation === "normalMove"
+                ? editor.previewMoveSelectedAlongNormals(value)
+                : editor.previewKnifeSelectedFace(value),
       );
     } catch (error) {
       onPreview(undefined);
@@ -126,7 +138,9 @@ export function ElementTransformPanel({
         editor.insetSelectedFaces(modelingValue);
       else if (modelingOperation === "bevel")
         editor.bevelSelectedElements(modelingValue);
-      else editor.moveSelectedAlongNormals(modelingValue);
+      else if (modelingOperation === "normalMove")
+        editor.moveSelectedAlongNormals(modelingValue);
+      else editor.knifeSelectedFace(modelingValue);
       closeModelingDialog();
     } catch (error) {
       onError(error instanceof Error ? error.message : String(error));
@@ -275,6 +289,10 @@ export function ElementTransformPanel({
         >
           <Scissors aria-hidden="true" />
           分割
+        </button>
+        <button type="button" onClick={() => openModelingDialog("knife")}>
+          <Scissors aria-hidden="true" />
+          Knife
         </button>
         <button
           type="button"

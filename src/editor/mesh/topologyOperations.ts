@@ -319,6 +319,79 @@ export function splitFace(mesh: EditableMesh, faceId: FaceId): EditableMesh {
   );
 }
 
+export function knifeFace(
+  mesh: EditableMesh,
+  faceId: FaceId,
+  factor = 0.5,
+): EditableMesh {
+  if (!Number.isFinite(factor) || factor <= 0 || factor >= 1)
+    throw new Error("Knife位置は0より大きく1未満で指定してください。");
+  const data = mesh.toMeshData();
+  const faceIndex = data.faceIds.indexOf(faceId);
+  if (faceIndex < 0) return mesh.clone();
+  const target = data.faces[faceIndex]!;
+  if (target.length < 4)
+    throw new Error("Knifeには4頂点以上のFaceを選択してください。");
+  const firstEdge = 0;
+  const secondEdge = Math.floor(target.length / 2);
+  const positions = [...data.positions];
+  const cutIndices = [firstEdge, secondEdge].map((edgeIndex) => {
+    const from = target[edgeIndex]!;
+    const to = target[(edgeIndex + 1) % target.length]!;
+    const fromPoint = vector(data.positions, from);
+    const toPoint = vector(data.positions, to);
+    const index = positions.length / 3;
+    positions.push(
+      fromPoint.x + (toPoint.x - fromPoint.x) * factor,
+      fromPoint.y + (toPoint.y - fromPoint.y) * factor,
+      fromPoint.z + (toPoint.z - fromPoint.z) * factor,
+    );
+    return { index, from, to };
+  });
+  const polygons: number[][] = [];
+  data.faces.forEach((face, index) => {
+    const expanded: number[] = [];
+    face.forEach((from, cursor) => {
+      const to = face[(cursor + 1) % face.length]!;
+      expanded.push(from);
+      const cut = cutIndices.find(
+        (candidate) =>
+          (candidate.from === from && candidate.to === to) ||
+          (candidate.from === to && candidate.to === from),
+      );
+      if (cut) expanded.push(cut.index);
+    });
+    if (index !== faceIndex) {
+      polygons.push(expanded);
+      return;
+    }
+    const first = expanded.indexOf(cutIndices[0]!.index);
+    const second = expanded.indexOf(cutIndices[1]!.index);
+    polygons.push(
+      cyclicSlice(expanded, first, second),
+      cyclicSlice(expanded, second, first),
+    );
+  });
+  return EditableMesh.fromPolygons(
+    Array.from({ length: positions.length / 3 }, (_, index) =>
+      vector(positions, index),
+    ),
+    polygons,
+  );
+}
+
+function cyclicSlice(values: readonly number[], from: number, to: number) {
+  const result = [values[from]!];
+  for (
+    let cursor = (from + 1) % values.length;
+    cursor !== to;
+    cursor = (cursor + 1) % values.length
+  )
+    result.push(values[cursor]!);
+  result.push(values[to]!);
+  return result;
+}
+
 export function splitEdge(mesh: EditableMesh, edgeId: EdgeId): EditableMesh {
   const data = mesh.toMeshData();
   const edge = data.edges.find((candidate) => candidate.id === edgeId);
