@@ -1,6 +1,7 @@
 import type { EditorCommand } from "../commands/EditorCommand";
 import type { ModelDocument } from "../document/ModelDocument";
 export class CommandHistory {
+  static readonly maxEntries = 200;
   readonly #undoStack: EditorCommand[] = [];
   readonly #redoStack: EditorCommand[] = [];
   get canUndo() {
@@ -12,6 +13,11 @@ export class CommandHistory {
   execute(command: EditorCommand, document: ModelDocument): void {
     command.execute(document);
     this.#undoStack.push(command);
+    if (this.#undoStack.length > CommandHistory.maxEntries)
+      this.#undoStack.splice(
+        0,
+        this.#undoStack.length - CommandHistory.maxEntries,
+      );
     this.#redoStack.length = 0;
   }
   undo(document: ModelDocument): EditorCommand | undefined {
@@ -31,5 +37,11 @@ export class CommandHistory {
   clear(): void {
     this.#undoStack.length = 0;
     this.#redoStack.length = 0;
+  }
+  get undoCount(): number {
+    return this.#undoStack.length;
+  }
+  get redoCount(): number {
+    return this.#redoStack.length;
   }
 }

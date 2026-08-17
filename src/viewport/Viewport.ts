@@ -223,7 +223,13 @@ export class Viewport {
       }
     }
 
-    if (this.#disposed) return;
+    if (this.#disposed) {
+      this.#renderer?.setAnimationLoop(null);
+      this.#renderer?.dispose();
+      this.#renderer = undefined;
+      this.element.replaceChildren();
+      return;
+    }
     this.#initializeControls();
     this.#initializeTransformControls();
     this.#resize();
@@ -381,7 +387,12 @@ export class Viewport {
       cancelAnimationFrame(this.#animationFrame);
     }
     this.#renderer?.setAnimationLoop(null);
+    this.#renderer?.domElement.removeEventListener(
+      "webglcontextlost",
+      this.#handleContextLost,
+    );
     this.#renderer?.dispose();
+    this.#renderer = undefined;
     this.#geometryAdapter.dispose();
     this.#environmentTexture?.dispose();
     this.element.replaceChildren();

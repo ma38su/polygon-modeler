@@ -30,4 +30,19 @@ describe("Command history", () => {
     editor.redo();
     expect(editor.getSnapshot().objects[0]?.transform.position.x).toBe(2);
   });
+  it("bounds retained commands during long editing sessions", () => {
+    const editor = new Editor();
+    const id = editor.createBox();
+    for (let x = 1; x <= 240; x += 1) {
+      const object = editor.getSnapshot().objects[0]!;
+      editor.transformObject(id, {
+        ...object.transform,
+        position: { ...object.transform.position, x },
+      });
+    }
+    expect(editor.history.undoCount).toBe(200);
+    for (let index = 0; index < 200; index += 1) editor.undo();
+    expect(editor.getSnapshot().objects[0]!.transform.position.x).toBe(40);
+    expect(editor.history.redoCount).toBe(200);
+  });
 });
