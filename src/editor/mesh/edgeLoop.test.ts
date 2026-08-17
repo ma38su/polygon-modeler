@@ -33,8 +33,10 @@ describe("edge loop and ring traversal", () => {
   it("does not invent a continuation around an n-gon", () => {
     const mesh = EditableMesh.fromPolygons(
       [
-        { x: 0, y: 0, z: 0 }, { x: 1, y: 0, z: 0 },
-        { x: 1.5, y: 1, z: 0 }, { x: 0.5, y: 2, z: 0 },
+        { x: 0, y: 0, z: 0 },
+        { x: 1, y: 0, z: 0 },
+        { x: 1.5, y: 1, z: 0 },
+        { x: 0.5, y: 2, z: 0 },
         { x: -0.5, y: 1, z: 0 },
       ],
       [[0, 1, 2, 3, 4]],
@@ -49,11 +51,15 @@ describe("edge loop and ring traversal", () => {
     const verticals = [...mesh.edges.values()]
       .filter((edge) => {
         const halfEdge = mesh.halfEdges.get(edge.halfEdges[0]!)!;
-        return mesh.vertices.get(halfEdge.origin)!.position.y !==
-          mesh.vertices.get(halfEdge.destination)!.position.y;
+        return (
+          mesh.vertices.get(halfEdge.origin)!.position.y !==
+          mesh.vertices.get(halfEdge.destination)!.position.y
+        );
       })
       .map((edge) => edge.id);
-    expect(new Set(collectEdgeLoop(mesh, new Set(verticals)))).toEqual(new Set(verticals));
+    expect(new Set(collectEdgeLoop(mesh, new Set(verticals)))).toEqual(
+      new Set(verticals),
+    );
   });
 });
 

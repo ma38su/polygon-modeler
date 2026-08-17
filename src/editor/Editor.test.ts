@@ -34,6 +34,36 @@ describe("Editor", () => {
     expect(editor.getSnapshot().selectionItems).toHaveLength(0);
     expect(editor.getSnapshot().selectionModes).toEqual(modes);
   });
+  it("commits common-gizmo object updates as one undoable edit", () => {
+    const editor = new Editor();
+    const first = editor.createBox();
+    const second = editor.createBox();
+    editor.transformObjects([
+      {
+        id: first,
+        transform: {
+          position: { x: -2, y: 0, z: 0 },
+          rotation: { x: 0, y: 0, z: 0 },
+          scale: { x: 1, y: 1, z: 1 },
+        },
+      },
+      {
+        id: second,
+        transform: {
+          position: { x: 2, y: 0, z: 0 },
+          rotation: { x: 0, y: 0, z: 0 },
+          scale: { x: 1, y: 1, z: 1 },
+        },
+      },
+    ]);
+    expect(
+      editor.getSnapshot().objects.map((object) => object.transform.position.x),
+    ).toEqual([-2, 2]);
+    editor.undo();
+    expect(
+      editor.getSnapshot().objects.map((object) => object.transform.position.x),
+    ).toEqual([0, 0]);
+  });
   it("selects all stable elements and clears them on mode changes", () => {
     const editor = new Editor();
     editor.createBox();
@@ -491,5 +521,37 @@ describe("Editor", () => {
     expect(editor.getSnapshot().objects[1]!.material).toEqual(
       editor.getSnapshot().objects[0]!.material,
     );
+  });
+  it("stores, previews, applies, and undoes a modifier stack", () => {
+    const editor = new Editor();
+    const id = editor.createPlane();
+    editor.setObjectModifiers(id, [
+      { id: "solid", type: "solidify", thickness: 0.2, enabled: true },
+    ]);
+    expect(editor.getSnapshot().objects[0]!.evaluatedMesh!.faces).toHaveLength(
+      6,
+    );
+    expect(editor.getSnapshot().objects[0]!.mesh.faces).toHaveLength(1);
+    editor.applyObjectModifiers(id);
+    expect(editor.getSnapshot().objects[0]!.mesh.faces).toHaveLength(6);
+    expect(editor.getSnapshot().objects[0]!.modifiers).toHaveLength(0);
+    editor.undo();
+    expect(editor.getSnapshot().objects[0]!.mesh.faces).toHaveLength(1);
+    expect(editor.getSnapshot().objects[0]!.modifiers).toHaveLength(1);
+  });
+  it("projects UVs and dissolves selected topology with undo", () => {
+    const editor = new Editor();
+    const objectId = editor.createPlane();
+    editor.setSelectionMode("face");
+    const faceId = editor.getSnapshot().objects[0]!.mesh.faceIds[0]!;
+    editor.selectElement({ objectId, elementId: faceId });
+    editor.projectSelectedFacesUv("xz");
+    expect(
+      editor.getSnapshot().objects[0]!.mesh.faceUvs![0]!.every(Boolean),
+    ).toBe(true);
+    editor.dissolveSelectedElements();
+    expect(editor.getSnapshot().objects[0]!.mesh.faces).toHaveLength(0);
+    editor.undo();
+    expect(editor.getSnapshot().objects[0]!.mesh.faces).toHaveLength(1);
   });
 });

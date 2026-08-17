@@ -2,7 +2,10 @@ import type { EdgeId, VertexId } from "../document/types";
 import type { EditableMesh } from "./EditableMesh";
 
 /** Continue straight through quad corners, stopping whenever continuation is ambiguous. */
-export function collectEdgeLoop(mesh: EditableMesh, initial: ReadonlySet<EdgeId>): EdgeId[] {
+export function collectEdgeLoop(
+  mesh: EditableMesh,
+  initial: ReadonlySet<EdgeId>,
+): EdgeId[] {
   const topology = buildTopology(mesh);
   const selected = new Set<EdgeId>();
   for (const seed of initial) {
@@ -15,7 +18,10 @@ export function collectEdgeLoop(mesh: EditableMesh, initial: ReadonlySet<EdgeId>
   return [...selected];
 }
 
-export function collectQuadEdgeRing(mesh: EditableMesh, initial: ReadonlySet<EdgeId>): EdgeId[] {
+export function collectQuadEdgeRing(
+  mesh: EditableMesh,
+  initial: ReadonlySet<EdgeId>,
+): EdgeId[] {
   const selected = new Set<EdgeId>();
   const edgeByPair = new Map<string, EdgeId>();
   for (const edge of mesh.edges.values()) {
@@ -30,11 +36,18 @@ export function collectQuadEdgeRing(mesh: EditableMesh, initial: ReadonlySet<Edg
       const halfEdge = mesh.halfEdges.get(halfEdgeId)!;
       const face = mesh.faces.get(halfEdge.face)!;
       if (face.vertices.length !== 4) continue;
-      const cursor = directedEdgeIndex(face.vertices, halfEdge.origin, halfEdge.destination);
+      const cursor = directedEdgeIndex(
+        face.vertices,
+        halfEdge.origin,
+        halfEdge.destination,
+      );
       if (cursor < 0) continue;
-      const opposite = edgeByPair.get(edgePairKey(
-        face.vertices[(cursor + 2) % 4]!, face.vertices[(cursor + 3) % 4]!,
-      ));
+      const opposite = edgeByPair.get(
+        edgePairKey(
+          face.vertices[(cursor + 2) % 4]!,
+          face.vertices[(cursor + 3) % 4]!,
+        ),
+      );
       if (opposite && !selected.has(opposite)) {
         selected.add(opposite);
         queue.push(opposite);
@@ -99,9 +112,11 @@ function buildTopology(mesh: EditableMesh): EdgeTopology {
   }
   for (const face of mesh.faces.values()) {
     if (face.vertices.length !== 4) continue;
-    const faceEdges = face.vertices.map((vertex, index) => edgeByPair.get(
-      edgePairKey(vertex, face.vertices[(index + 1) % face.vertices.length]!),
-    )!);
+    const faceEdges = face.vertices.map((vertex, index) =>
+      edgeByPair.get(
+        edgePairKey(vertex, face.vertices[(index + 1) % face.vertices.length]!),
+      )!,
+    );
     for (let index = 0; index < faceEdges.length; index++) {
       const edge = faceEdges[index]!;
       const neighbors = quadNeighbors.get(edge) ?? new Set<EdgeId>();
@@ -113,9 +128,15 @@ function buildTopology(mesh: EditableMesh): EdgeTopology {
   return { edgesByVertex, verticesByEdge, quadNeighbors };
 }
 
-function directedEdgeIndex(vertices: readonly VertexId[], origin: VertexId, destination: VertexId): number {
-  return vertices.findIndex((vertex, index) =>
-    vertex === origin && vertices[(index + 1) % vertices.length] === destination,
+function directedEdgeIndex(
+  vertices: readonly VertexId[],
+  origin: VertexId,
+  destination: VertexId,
+): number {
+  return vertices.findIndex(
+    (vertex, index) =>
+      vertex === origin &&
+      vertices[(index + 1) % vertices.length] === destination,
   );
 }
 

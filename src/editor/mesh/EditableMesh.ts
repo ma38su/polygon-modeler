@@ -20,6 +20,7 @@ export interface MeshHalfEdge {
   readonly next: HalfEdgeId;
   readonly face: FaceId;
   readonly edge: EdgeId;
+  uv?: { readonly u: number; readonly v: number };
 }
 export interface MeshEdge {
   readonly id: EdgeId;
@@ -62,7 +63,10 @@ export class EditableMesh {
     for (const [id, vertex] of this.vertices)
       copy.vertices.set(id, { ...vertex, position: { ...vertex.position } });
     for (const [id, halfEdge] of this.halfEdges)
-      copy.halfEdges.set(id, { ...halfEdge });
+      copy.halfEdges.set(id, {
+        ...halfEdge,
+        uv: halfEdge.uv ? { ...halfEdge.uv } : undefined,
+      });
     for (const [id, edge] of this.edges)
       copy.edges.set(id, { ...edge, halfEdges: [...edge.halfEdges] });
     for (const [id, face] of this.faces)
@@ -82,6 +86,7 @@ export class EditableMesh {
       })),
       halfEdges: [...this.halfEdges.values()].map((halfEdge) => ({
         ...halfEdge,
+        uv: halfEdge.uv ? { ...halfEdge.uv } : undefined,
       })),
       edges: [...this.edges.values()].map((edge) => ({
         ...edge,
@@ -108,7 +113,10 @@ export class EditableMesh {
         position: { ...vertex.position },
       });
     for (const halfEdge of archive.halfEdges)
-      mesh.halfEdges.set(halfEdge.id, { ...halfEdge });
+      mesh.halfEdges.set(halfEdge.id, {
+        ...halfEdge,
+        uv: halfEdge.uv ? { ...halfEdge.uv } : undefined,
+      });
     for (const edge of archive.edges)
       mesh.edges.set(edge.id, { ...edge, halfEdges: [...edge.halfEdges] });
     for (const face of archive.faces)
@@ -131,7 +139,10 @@ export class EditableMesh {
         position: { ...vertex.position },
       });
     for (const [id, halfEdge] of source.halfEdges)
-      this.halfEdges.set(id, { ...halfEdge });
+      this.halfEdges.set(id, {
+        ...halfEdge,
+        uv: halfEdge.uv ? { ...halfEdge.uv } : undefined,
+      });
     for (const [id, edge] of source.edges)
       this.edges.set(id, { ...edge, halfEdges: [...edge.halfEdges] });
     for (const [id, face] of source.faces)
@@ -146,6 +157,7 @@ export class EditableMesh {
     applyEntityPatch(this.vertices, patch.vertices, cloneVertex);
     applyEntityPatch(this.halfEdges, patch.halfEdges, (value) => ({
       ...value,
+      uv: value.uv ? { ...value.uv } : undefined,
     }));
     applyEntityPatch(this.edges, patch.edges, (value) => ({
       ...value,
@@ -303,6 +315,18 @@ export class EditableMesh {
     const indexById = new Map(
       vertices.map((vertex, index) => [vertex.id, index]),
     );
+    const uvByCorner = new Map<string, MeshHalfEdge["uv"]>();
+    for (const halfEdge of this.halfEdges.values())
+      if (halfEdge.uv)
+        uvByCorner.set(`${halfEdge.face}|${halfEdge.origin}`, halfEdge.uv);
+    const faceUvs = uvByCorner.size
+      ? [...this.faces.values()].map((face) =>
+          face.vertices.map((vertexId) => {
+            const uv = uvByCorner.get(`${face.id}|${vertexId}`);
+            return uv ? { ...uv } : null;
+          }),
+        )
+      : undefined;
     return {
       positions: vertices.flatMap((vertex) => [
         vertex.position.x,
@@ -315,6 +339,7 @@ export class EditableMesh {
       revision: this.#revision,
       vertexIds: vertices.map((vertex) => vertex.id),
       faceIds: [...this.faces.keys()],
+      faceUvs,
       edges: [...this.edges.values()].map((edge) => {
         const halfEdge = this.halfEdges.get(edge.halfEdges[0]!)!;
         return {

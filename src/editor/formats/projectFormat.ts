@@ -1,10 +1,10 @@
 import { defaultMaterial, ModelObject } from "../document/ModelObject";
-import type { MaterialValue } from "../document/types";
+import type { MaterialValue, ModifierValue } from "../document/types";
 import type { HalfEdgeId, ObjectId, VertexId } from "../document/types";
 import { EditableMesh, type EditableMeshArchive } from "../mesh/EditableMesh";
 import { validateMesh } from "../mesh/validateMesh";
 
-export const PROJECT_FORMAT_VERSION = 1;
+export const PROJECT_FORMAT_VERSION = 2;
 export const PROJECT_EXTENSION = ".polyproj";
 
 interface ProjectMeshRecord extends Omit<EditableMeshArchive, "vertices"> {
@@ -26,6 +26,7 @@ interface ProjectRecord {
     readonly visible: boolean;
     readonly transform: ModelObject["transform"];
     readonly material?: MaterialValue;
+    readonly modifiers?: readonly ModifierValue[];
     readonly mesh: ProjectMeshRecord;
   }[];
 }
@@ -107,6 +108,7 @@ export function serializeProject(objects: readonly ModelObject[]): string {
         visible: object.visible,
         transform: object.transform,
         material: object.material,
+        modifiers: object.modifiers,
         mesh: {
           halfEdges: archive.halfEdges,
           edges: archive.edges,
@@ -135,7 +137,10 @@ export function deserializeProject(source: string): ModelObject[] {
   if (!parsed || typeof parsed !== "object")
     throw new Error("プロジェクトデータが不正です");
   const record = parsed as Partial<ProjectRecord>;
-  if (record.formatVersion !== PROJECT_FORMAT_VERSION)
+  if (
+    record.formatVersion !== 1 &&
+    record.formatVersion !== PROJECT_FORMAT_VERSION
+  )
     throw new Error(
       `未対応のformatVersionです: ${String(record.formatVersion)}`,
     );
@@ -182,6 +187,7 @@ export function deserializeProject(source: string): ModelObject[] {
     object.visible = item.visible;
     object.transform = item.transform;
     object.material = item.material ?? defaultMaterial();
+    object.modifiers = item.modifiers ? structuredClone(item.modifiers) : [];
     return object;
   });
 }

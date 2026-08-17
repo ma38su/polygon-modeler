@@ -3,6 +3,7 @@ import type { ModelDocument } from "../document/ModelDocument";
 import { ModelObject } from "../document/ModelObject";
 import type {
   MaterialValue,
+  ModifierValue,
   ObjectId,
   TransformValue,
 } from "../document/types";
@@ -20,6 +21,35 @@ export class CreateObjectCommand implements EditorCommand {
   }
   redo(document: ModelDocument) {
     document.addObject(this.object);
+  }
+}
+export class SetObjectModifiersCommand implements EditorCommand {
+  readonly label = "モディファイアを変更";
+  readonly id: ObjectId;
+  readonly before: readonly ModifierValue[];
+  readonly after: readonly ModifierValue[];
+  constructor(
+    id: ObjectId,
+    before: readonly ModifierValue[],
+    after: readonly ModifierValue[],
+  ) {
+    this.id = id;
+    this.before = before;
+    this.after = after;
+  }
+  execute(document: ModelDocument) {
+    this.#apply(document, this.after);
+  }
+  undo(document: ModelDocument) {
+    this.#apply(document, this.before);
+  }
+  redo(document: ModelDocument) {
+    this.#apply(document, this.after);
+  }
+  #apply(document: ModelDocument, modifiers: readonly ModifierValue[]) {
+    const object = document.getObject(this.id);
+    if (!object) throw new Error(`Object not found: ${this.id}`);
+    object.modifiers = [...structuredClone(modifiers)];
   }
 }
 export class DeleteObjectCommand implements EditorCommand {

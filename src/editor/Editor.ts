@@ -20,9 +20,11 @@ import {
   CreateObjectCommand,
   DeleteObjectCommand,
   SetObjectMaterialCommand,
+  SetObjectModifiersCommand,
   TransformObjectCommand,
 } from "./commands/objectCommands";
 import type { TransformValue } from "./document/types";
+import type { ModifierValue } from "./document/types";
 import {
   SelectionManager,
   type SelectionItem,
@@ -74,6 +76,19 @@ import {
   numericElementTransformUpdates,
   numericObjectTransformUpdates,
 } from "./transform/numericElementTransform";
+import {
+  bridgeEdgeLoops,
+  dissolveEdges,
+  dissolveFaces,
+  dissolveVertices,
+  fillBoundary,
+} from "./mesh/topologyEditOperations";
+import {
+  projectUv,
+  transformUv,
+  type UvProjectionPlane,
+} from "./mesh/uvOperations";
+import { evaluateModifierStack } from "./modifiers/modifierStack";
 type Listener = () => void;
 const clampUnit = (value: number) => Math.min(1, Math.max(0, value));
 export class Editor {
@@ -177,6 +192,7 @@ export class Editor {
       );
       copy.transform = structuredClone(source.transform);
       copy.material = structuredClone(source.material);
+      copy.modifiers = structuredClone(source.modifiers);
       copy.visible = source.visible;
       return copy;
     });
@@ -205,6 +221,7 @@ export class Editor {
       );
       copy.transform = structuredClone(source.transform);
       copy.material = structuredClone(source.material);
+      copy.modifiers = structuredClone(source.modifiers);
       copy.visible = source.visible;
       return copy;
     });
@@ -456,6 +473,22 @@ export class Editor {
     );
     this.#commit(true);
   }
+  transformObjects(
+    updates: readonly { id: ObjectId; transform: TransformValue }[],
+  ): void {
+    const commands = updates.flatMap(({ id, transform }) => {
+      const object = this.document.getObject(id);
+      return object
+        ? [new TransformObjectCommand(id, object.transform, transform)]
+        : [];
+    });
+    if (!commands.length) return;
+    this.history.execute(
+      new CompositeCommand("複数オブジェクトを変形", commands),
+      this.document,
+    );
+    this.#commit(true);
+  }
   transformSelectedObjectsInFrame(
     mode: TransformMode,
     values: Vector3Value,
@@ -495,6 +528,33 @@ export class Editor {
       new SetObjectMaterialCommand(id, object.material, normalized),
       this.document,
     );
+    this.#commit(true);
+  }
+  setObjectModifiers(id: ObjectId, modifiers: readonly ModifierValue[]): void {
+    const object = this.document.getObject(id);
+    if (!object) return;
+    this.history.execute(
+      new SetObjectModifiersCommand(id, object.modifiers, modifiers),
+      this.document,
+    );
+    this.#commit(true);
+  }
+  applyObjectModifiers(id: ObjectId): void {
+    const object = this.document.getObject(id);
+    if (!object || !object.modifiers.length) return;
+    this.history.execute(
+      new CompositeCommand("モディファイアを適用", [
+        new EditMeshCommand(
+          "モディファイアを適用",
+          id,
+          object.mesh,
+          evaluateModifierStack(object.mesh, object.modifiers),
+        ),
+        new SetObjectModifiersCommand(id, object.modifiers, []),
+      ]),
+      this.document,
+    );
+    this.selection.clear();
     this.#commit(true);
   }
   translateSelected(delta: Vector3Value): void {
@@ -850,6 +910,113 @@ export class Editor {
       return edge ? splitEdge(mesh, edge.elementId as EdgeId) : mesh.clone();
     });
   }
+  dissolveSelectedElements(): void {
+    this.#applyTopology("Dissolve", (mesh, items) => {
+      const vertices = new Set(
+        items
+          .map((item) => item.elementId as VertexId)
+          .filter((id) => mesh.vertices.has(id)),
+      );
+      if (vertices.size) return dissolveVertices(mesh, vertices);
+      const edges = new Set(
+        items
+          .map((item) => item.elementId as EdgeId)
+          .filter((id) => mesh.edges.has(id)),
+      );
+      if (edges.size) return dissolveEdges(mesh, edges);
+      return dissolveFaces(
+        mesh,
+        new Set(
+          items
+            .map((item) => item.elementId as FaceId)
+            .filter((id) => mesh.faces.has(id)),
+        ),
+      );
+    });
+  }
+  fillSelectedBoundary(): void {
+    this.#applyTopology("Fill", (mesh, items) =>
+      fillBoundary(
+        mesh,
+        new Set(
+          items
+            .map((item) => item.elementId as EdgeId)
+            .filter((id) => mesh.edges.has(id)),
+        ),
+      ),
+    );
+  }
+  bridgeSelectedEdgeLoops(): void {
+    this.#applyTopology("Bridge Edge Loops", (mesh, items) => {
+      const selected = new Set(
+        items
+          .map((item) => item.elementId as EdgeId)
+          .filter((id) => mesh.edges.has(id)),
+      );
+      const components: Set<EdgeId>[] = [];
+      while (selected.size) {
+        const component = new Set<EdgeId>();
+        const queue = [selected.values().next().value!];
+        selected.delete(queue[0]!);
+        for (let cursor = 0; cursor < queue.length; cursor += 1) {
+          const id = queue[cursor]!;
+          component.add(id);
+          const edge = mesh.edges.get(id)!;
+          const vertices = new Set(
+            edge.halfEdges.flatMap((halfEdgeId) => {
+              const halfEdge = mesh.halfEdges.get(halfEdgeId)!;
+              return [halfEdge.origin, halfEdge.destination];
+            }),
+          );
+          for (const candidate of [...selected]) {
+            const other = mesh.edges.get(candidate)!;
+            if (
+              other.halfEdges.some((halfEdgeId) => {
+                const halfEdge = mesh.halfEdges.get(halfEdgeId)!;
+                return (
+                  vertices.has(halfEdge.origin) ||
+                  vertices.has(halfEdge.destination)
+                );
+              })
+            ) {
+              selected.delete(candidate);
+              queue.push(candidate);
+            }
+          }
+        }
+        components.push(component);
+      }
+      if (components.length !== 2)
+        throw new Error("Bridgeには2つの境界Edge Loopを選択してください。");
+      return bridgeEdgeLoops(mesh, components[0]!, components[1]!);
+    });
+  }
+  projectSelectedFacesUv(plane: UvProjectionPlane): void {
+    this.#applySelectionMesh("UV投影", (mesh, items) =>
+      projectUv(
+        mesh,
+        new Set(
+          items
+            .map((item) => item.elementId as FaceId)
+            .filter((id) => mesh.faces.has(id)),
+        ),
+        plane,
+      ),
+    );
+  }
+  transformSelectedFacesUv(options: Parameters<typeof transformUv>[2]): void {
+    this.#applySelectionMesh("UV変形", (mesh, items) =>
+      transformUv(
+        mesh,
+        new Set(
+          items
+            .map((item) => item.elementId as FaceId)
+            .filter((id) => mesh.faces.has(id)),
+        ),
+        options,
+      ),
+    );
+  }
   knifeSelectedFace(factor = 0.5): void {
     this.#applyTopology("Knife", (mesh, items) => {
       const face = items.find((item) =>
@@ -1001,7 +1168,12 @@ export class Editor {
     for (const [objectId, items] of this.#selectionGroups()) {
       const object = this.document.getObject(objectId);
       if (!object) continue;
-      const after = operation(object.mesh, items);
+      let after = operation(object.mesh, items);
+      if (
+        [...object.mesh.halfEdges.values()].some((halfEdge) => halfEdge.uv) &&
+        ![...after.halfEdges.values()].some((halfEdge) => halfEdge.uv)
+      )
+        after = projectUv(after, new Set(after.faces.keys()), "xz");
       const validation = validateMesh(after);
       if (!validation.valid) throw new Error(validation.errors.join("\n"));
       commands.push(new EditMeshCommand(label, objectId, object.mesh, after));

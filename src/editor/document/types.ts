@@ -14,18 +14,67 @@ export interface TransformValue {
   readonly scale: Vector3Value;
 }
 export type ShadingModel = "basic" | "lambert" | "phong" | "standard";
+export interface TextureValue {
+  /** Embedded data URL or a project-relative URL. */
+  readonly source: string;
+  readonly name?: string;
+  readonly colorSpace?: "srgb" | "linear";
+}
 export interface MaterialValue {
   readonly color: string;
   readonly shading: ShadingModel;
   readonly roughness: number;
   readonly metalness: number;
+  readonly textures?: {
+    readonly baseColor?: TextureValue;
+    readonly normal?: TextureValue;
+    readonly roughness?: TextureValue;
+    readonly metalness?: TextureValue;
+  };
 }
+export type ModifierValue =
+  | {
+      readonly id: string;
+      readonly type: "mirror";
+      readonly axis: "x" | "y" | "z";
+      readonly enabled: boolean;
+    }
+  | {
+      readonly id: string;
+      readonly type: "array";
+      readonly count: number;
+      readonly offset: Vector3Value;
+      readonly enabled: boolean;
+    }
+  | {
+      readonly id: string;
+      readonly type: "solidify";
+      readonly thickness: number;
+      readonly enabled: boolean;
+    }
+  | {
+      readonly id: string;
+      readonly type: "bevel";
+      readonly amount: number;
+      readonly enabled: boolean;
+    }
+  | {
+      readonly id: string;
+      readonly type: "subdivision";
+      readonly levels: number;
+      readonly enabled: boolean;
+    };
 export interface MeshData {
   readonly positions: readonly number[];
   readonly faces: readonly (readonly number[])[];
   readonly revision: number;
   readonly vertexIds: readonly VertexId[];
   readonly faceIds: readonly FaceId[];
+  /** Per-face UVs, in the same corner order as `faces`. */
+  readonly faceUvs?: readonly (readonly ({
+    readonly u: number;
+    readonly v: number;
+  } | null)[])[];
   readonly edges: readonly {
     readonly id: EdgeId;
     readonly vertices: readonly [number, number];
@@ -37,7 +86,9 @@ export interface ModelObjectSnapshot {
   readonly visible: boolean;
   readonly transform: TransformValue;
   readonly material: MaterialValue;
+  readonly modifiers?: readonly ModifierValue[];
   readonly mesh: MeshData;
+  readonly evaluatedMesh?: MeshData;
 }
 export interface EditorSnapshot {
   readonly objects: readonly ModelObjectSnapshot[];

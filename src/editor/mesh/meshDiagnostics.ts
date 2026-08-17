@@ -6,6 +6,7 @@ export interface MeshDiagnostics {
   readonly degenerateFaces: number;
   readonly isolatedVertices: number;
   readonly closed: boolean;
+  readonly inverted: boolean;
   readonly healthy: boolean;
 }
 
@@ -48,12 +49,28 @@ function calculateMeshDiagnostics(mesh: MeshData): MeshDiagnostics {
     (count) => count > 2,
   ).length;
   const isolatedVertices = mesh.vertexIds.length - usedVertices.size;
+  const closed =
+    edgeUse.size > 0 && boundaryEdges === 0 && nonManifoldEdges === 0;
+  const signedVolume = mesh.faces.reduce((sum, face) => {
+    const a = point(mesh, face[0]!);
+    for (let index = 1; index + 1 < face.length; index += 1) {
+      const b = point(mesh, face[index]!);
+      const c = point(mesh, face[index + 1]!);
+      sum +=
+        (a.x * (b.y * c.z - b.z * c.y) +
+          a.y * (b.z * c.x - b.x * c.z) +
+          a.z * (b.x * c.y - b.y * c.x)) /
+        6;
+    }
+    return sum;
+  }, 0);
   return {
     boundaryEdges,
     nonManifoldEdges,
     degenerateFaces,
     isolatedVertices,
-    closed: edgeUse.size > 0 && boundaryEdges === 0 && nonManifoldEdges === 0,
+    closed,
+    inverted: closed && signedVolume < -1e-10,
     healthy:
       nonManifoldEdges === 0 && degenerateFaces === 0 && isolatedVertices === 0,
   };
