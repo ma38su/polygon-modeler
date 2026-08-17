@@ -4,6 +4,7 @@
 
 - Half-edge不変条件、選択、Command履歴、保存形式、GLB / STL変換をVitestで検証
 - 10,000頂点 / 9,801面のグリッドについて、構築・検証・複製・保存アーカイブ復元を2.5秒以内とする回帰基準
+- 同じ10,000頂点Gridで連結選択、描画Geometry / Overlay準備、移動Undoを個別計測。上限は[Performance budgets](PERFORMANCE.md)に記録
 - ChromiumのProduction buildで作成、選択、編集、Undo / Redo、保存、再読込、自動保存復元、GLB / STL出力、STL再読込をPlaywrightで検証
 - WebGPU利用可能環境では、WebGPU / WebGL 2双方のViewport契約を検証。手動比較結果は[Renderer parity report](RENDERER_PARITY.md)に記録
 - Viewport破棄時にAnimationFrame、Renderer、Controls、Geometry、Material、イベント、ResizeObserverを解放

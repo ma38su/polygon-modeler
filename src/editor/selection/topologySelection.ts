@@ -1,4 +1,4 @@
-import type { EdgeId } from "../document/types";
+import type { EdgeId, FaceId, VertexId } from "../document/types";
 import type { EditableMesh } from "../mesh/EditableMesh";
 import type { SelectionItem } from "./SelectionManager";
 
@@ -9,7 +9,7 @@ export function changeSelectionByAdjacency(
   selectedIds: readonly SelectionItem["elementId"][],
   operation: AdjacencySelectionOperation,
 ): SelectionItem["elementId"][] {
-  const neighbors = buildAdjacency(mesh);
+  const neighbors = buildAdjacency(mesh, selectedIds);
   const selected = new Set(selectedIds as readonly string[]);
   if (operation === "grow") {
     for (const id of [...selected])
@@ -70,38 +70,46 @@ export function selectQuadEdgeLoop(
   return [...selected];
 }
 
-function buildAdjacency(mesh: EditableMesh): Map<string, Set<string>> {
+function buildAdjacency(
+  mesh: EditableMesh,
+  selectedIds: readonly SelectionItem["elementId"][],
+): Map<string, Set<string>> {
   const neighbors = new Map<string, Set<string>>();
+  const includeVertices = selectedIds.some((id) =>
+    mesh.vertices.has(id as VertexId),
+  );
+  const includeEdges = selectedIds.some((id) => mesh.edges.has(id as EdgeId));
+  const includeFaces = selectedIds.some((id) => mesh.faces.has(id as FaceId));
   const connect = (a: string, b: string) => {
     if (a === b) return;
     (neighbors.get(a) ?? neighbors.set(a, new Set()).get(a)!).add(b);
     (neighbors.get(b) ?? neighbors.set(b, new Set()).get(b)!).add(a);
   };
-  for (const edge of mesh.edges.values()) {
-    const halfEdge = mesh.halfEdges.get(edge.halfEdges[0]!)!;
-    connect(halfEdge.origin, halfEdge.destination);
-  }
-  const edgesByVertex = new Map<string, EdgeId[]>();
-  for (const edge of mesh.edges.values()) {
-    const halfEdge = mesh.halfEdges.get(edge.halfEdges[0]!)!;
-    for (const vertex of [halfEdge.origin, halfEdge.destination]) {
-      const incident = edgesByVertex.get(vertex) ?? [];
-      incident.push(edge.id);
-      edgesByVertex.set(vertex, incident);
+  if (includeVertices)
+    for (const edge of mesh.edges.values()) {
+      const halfEdge = mesh.halfEdges.get(edge.halfEdges[0]!)!;
+      connect(halfEdge.origin, halfEdge.destination);
     }
+  if (includeEdges) {
+    const edgesByVertex = new Map<string, EdgeId[]>();
+    for (const edge of mesh.edges.values()) {
+      const halfEdge = mesh.halfEdges.get(edge.halfEdges[0]!)!;
+      for (const vertex of [halfEdge.origin, halfEdge.destination]) {
+        const incident = edgesByVertex.get(vertex) ?? [];
+        incident.push(edge.id);
+        edgesByVertex.set(vertex, incident);
+      }
+    }
+    for (const incident of edgesByVertex.values())
+      for (let i = 0; i < incident.length; i++)
+        for (let j = i + 1; j < incident.length; j++)
+          connect(incident[i]!, incident[j]!);
   }
-  for (const incident of edgesByVertex.values())
-    for (let i = 0; i < incident.length; i++)
-      for (let j = i + 1; j < incident.length; j++)
-        connect(incident[i]!, incident[j]!);
-  const faces = [...mesh.faces.values()];
-  for (let i = 0; i < faces.length; i++)
-    for (let j = i + 1; j < faces.length; j++)
-      if (
-        faces[i]!.vertices.filter((id) => faces[j]!.vertices.includes(id))
-          .length >= 2
-      )
-        connect(faces[i]!.id, faces[j]!.id);
+  if (includeFaces)
+    for (const edge of mesh.edges.values()) {
+      const faces = edge.halfEdges.map((id) => mesh.halfEdges.get(id)!.face);
+      if (faces.length === 2) connect(faces[0]!, faces[1]!);
+    }
   return neighbors;
 }
 
