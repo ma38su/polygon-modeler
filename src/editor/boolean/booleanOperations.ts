@@ -1,7 +1,16 @@
-import type { BufferGeometry } from "three";
+import { BufferGeometry, Float32BufferAttribute } from "three";
+import {
+  ADDITION,
+  Brush,
+  Evaluator,
+  INTERSECTION,
+  SUBTRACTION,
+} from "three-bvh-csg";
+import { mergeVertices } from "three/examples/jsm/utils/BufferGeometryUtils.js";
 import type { ModelObjectSnapshot, Vector3Value } from "../document/types";
 import { EditableMesh } from "../mesh/EditableMesh";
 import { joinObjectMeshes } from "../mesh/objectOperations";
+import { repairPolygonWinding } from "../mesh/repairOperations";
 import { triangulate } from "../mesh/triangulate";
 
 export type BooleanOperation = "union" | "subtract" | "intersect";
@@ -14,12 +23,6 @@ export async function evaluateBoolean(
   assertClosed(left);
   assertClosed(right);
 
-  const [{ BufferGeometry, Float32BufferAttribute }, csg, geometryUtils] =
-    await Promise.all([
-      import("three"),
-      import("three-bvh-csg"),
-      import("three/examples/jsm/utils/BufferGeometryUtils.js"),
-    ]);
   const leftGeometry = toGeometry(
     joinObjectMeshes([left]),
     BufferGeometry,
@@ -30,18 +33,18 @@ export async function evaluateBoolean(
     BufferGeometry,
     Float32BufferAttribute,
   );
-  const leftBrush = new csg.Brush(leftGeometry);
-  const rightBrush = new csg.Brush(rightGeometry);
+  const leftBrush = new Brush(leftGeometry);
+  const rightBrush = new Brush(rightGeometry);
   leftBrush.updateMatrixWorld(true);
   rightBrush.updateMatrixWorld(true);
-  const evaluator = new csg.Evaluator();
+  const evaluator = new Evaluator();
   evaluator.useGroups = false;
   evaluator.attributes = ["position", "normal"];
 
   const operationCode = {
-    union: csg.ADDITION,
-    subtract: csg.SUBTRACTION,
-    intersect: csg.INTERSECTION,
+    union: ADDITION,
+    subtract: SUBTRACTION,
+    intersect: INTERSECTION,
   }[operation];
   const result = evaluator.evaluate(leftBrush, rightBrush, operationCode);
 
@@ -49,7 +52,7 @@ export async function evaluateBoolean(
     // Normals split otherwise coincident result vertices, so weld positions first.
     result.geometry.deleteAttribute("normal");
     result.geometry.deleteAttribute("uv");
-    const welded = geometryUtils.mergeVertices(result.geometry, 1e-5);
+    const welded = mergeVertices(result.geometry, 1e-5);
     try {
       const mesh = fromGeometry(welded);
       if (!mesh.faces.size)
@@ -86,8 +89,8 @@ function assertClosed(object: ModelObjectSnapshot): void {
 
 function toGeometry(
   mesh: EditableMesh,
-  Geometry: typeof import("three").BufferGeometry,
-  PositionAttribute: typeof import("three").Float32BufferAttribute,
+  Geometry: typeof BufferGeometry,
+  PositionAttribute: typeof Float32BufferAttribute,
 ): BufferGeometry {
   const data = mesh.toMeshData();
   const geometry = new Geometry();
@@ -134,7 +137,10 @@ function fromGeometry(geometry: BufferGeometry): EditableMesh {
       faces.push(face);
     }
   }
-  return EditableMesh.fromPolygons(positions, faces);
+  return EditableMesh.fromPolygons(
+    positions,
+    repairPolygonWinding(positions, faces),
+  );
 }
 
 function triangleAreaSquared(

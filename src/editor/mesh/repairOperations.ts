@@ -61,12 +61,29 @@ export function mergeByDistance(
 
 export function recalculateFaceNormals(mesh: EditableMesh): EditableMesh {
   const data = mesh.toMeshData();
-  const faces = data.faces.map((face) => [...face]);
+  const faces = repairPolygonWinding(
+    data.vertexIds.map((_, index) => point(data.positions, index)),
+    data.faces,
+  );
+  return EditableMesh.fromPolygons(
+    data.vertexIds.map((_, index) => point(data.positions, index)),
+    faces,
+  );
+}
+
+/** Repairs adjacent polygon winding before half-edge topology is constructed. */
+export function repairPolygonWinding(
+  positions: readonly Vector3Value[],
+  polygons: readonly (readonly number[])[],
+): number[][] {
+  const faces = polygons.map((face) => [...face]);
   const edges = new Map<string, { face: number; from: number; to: number }[]>();
+  const faceEdges: string[][] = faces.map(() => []);
   faces.forEach((face, faceIndex) =>
     face.forEach((from, index) => {
       const to = face[(index + 1) % face.length]!;
       const edgeKey = from < to ? `${from}:${to}` : `${to}:${from}`;
+      faceEdges[faceIndex]!.push(edgeKey);
       edges.set(edgeKey, [
         ...(edges.get(edgeKey) ?? []),
         { face: faceIndex, from, to },
@@ -74,53 +91,56 @@ export function recalculateFaceNormals(mesh: EditableMesh): EditableMesh {
     }),
   );
   const visited = new Set<number>();
+  const flipped = new Set<number>();
   for (let start = 0; start < faces.length; start += 1) {
     if (visited.has(start)) continue;
     const component: number[] = [];
+    const componentEdgeKeys = new Set<string>();
     const queue = [start];
+    let queueIndex = 0;
     visited.add(start);
-    while (queue.length) {
-      const faceIndex = queue.shift()!;
+    while (queueIndex < queue.length) {
+      const faceIndex = queue[queueIndex++]!;
       component.push(faceIndex);
-      const face = faces[faceIndex]!;
-      face.forEach((from, index) => {
-        const to = face[(index + 1) % face.length]!;
-        const edgeKey = from < to ? `${from}:${to}` : `${to}:${from}`;
-        for (const neighbor of edges.get(edgeKey) ?? []) {
+      faceEdges[faceIndex]!.forEach((edgeKey) => {
+        componentEdgeKeys.add(edgeKey);
+        const uses = edges.get(edgeKey) ?? [];
+        const currentUse = uses.find((use) => use.face === faceIndex)!;
+        for (const neighbor of uses) {
           if (neighbor.face === faceIndex || visited.has(neighbor.face))
             continue;
-          if (neighbor.from === from && neighbor.to === to)
-            faces[neighbor.face]!.reverse();
+          const sameDirection =
+            neighbor.from === currentUse.from && neighbor.to === currentUse.to;
+          if (flipped.has(faceIndex) !== sameDirection)
+            flipped.add(neighbor.face);
           visited.add(neighbor.face);
           queue.push(neighbor.face);
         }
       });
     }
-    const componentEdges = [...edges.values()].filter((uses) =>
-      uses.some((use) => component.includes(use.face)),
-    );
+    component.forEach((faceIndex) => {
+      if (flipped.has(faceIndex)) faces[faceIndex]!.reverse();
+    });
+    const componentEdges = [...componentEdgeKeys].map((key) => edges.get(key)!);
     const closed = componentEdges.every((uses) => uses.length === 2);
-    if (closed && signedVolume(data.positions, faces, component) < 0)
+    if (closed && signedVolumeFromPoints(positions, faces, component) < 0)
       component.forEach((faceIndex) => faces[faceIndex]!.reverse());
   }
-  return EditableMesh.fromPolygons(
-    data.vertexIds.map((_, index) => point(data.positions, index)),
-    faces,
-  );
+  return faces;
 }
 
-function signedVolume(
-  positions: readonly number[],
+function signedVolumeFromPoints(
+  positions: readonly Vector3Value[],
   faces: readonly (readonly number[])[],
   component: readonly number[],
 ): number {
   let volume = 0;
   for (const faceIndex of component) {
     const face = faces[faceIndex]!;
-    const a = point(positions, face[0]!);
+    const a = positions[face[0]!]!;
     for (let index = 1; index < face.length - 1; index += 1) {
-      const b = point(positions, face[index]!);
-      const c = point(positions, face[index + 1]!);
+      const b = positions[face[index]!]!;
+      const c = positions[face[index + 1]!]!;
       volume +=
         (a.x * (b.y * c.z - b.z * c.y) +
           a.y * (b.z * c.x - b.x * c.z) +

@@ -39,6 +39,7 @@ export class RegionPicker {
           camera,
           bounds,
         );
+      const fullyEnclosed = shape === "lasso";
       if (modes.has("vertex"))
         object.mesh.vertexIds.forEach((elementId, index) => {
           if (contains(polygon, projectVertex(index)))
@@ -48,19 +49,27 @@ export class RegionPicker {
         object.mesh.edges.forEach((edge) => {
           const start = projectVertex(edge.vertices[0]);
           const end = projectVertex(edge.vertices[1]);
-          if (contains(polygon, midpoint(start, end)))
+          if (
+            fullyEnclosed
+              ? contains(polygon, start) && contains(polygon, end)
+              : contains(polygon, midpoint(start, end))
+          )
             items.push({ objectId: object.id, elementId: edge.id });
         });
       if (modes.has("face"))
         object.mesh.faces.forEach((face, index) => {
-          const sum = face
-            .map(projectVertex)
+          const vertices = face.map(projectVertex);
+          const sum = vertices
             .reduce(
               (sum, point) => ({ x: sum.x + point.x, y: sum.y + point.y }),
               { x: 0, y: 0 },
             );
           const center = { x: sum.x / face.length, y: sum.y / face.length };
-          if (contains(polygon, center))
+          if (
+            fullyEnclosed
+              ? vertices.every((vertex) => contains(polygon, vertex))
+              : contains(polygon, center)
+          )
             items.push({
               objectId: object.id,
               elementId: object.mesh.faceIds[index]!,
@@ -99,6 +108,11 @@ function contains(
   polygon: readonly ScreenPoint[],
   point: ScreenPoint,
 ): boolean {
+  // A point on the lasso stroke counts as enclosed. This makes the result
+  // stable when a stroke runs exactly through a projected vertex.
+  if (polygon.some((start, index) =>
+    pointOnSegment(start, polygon[(index + 1) % polygon.length]!, point),
+  )) return true;
   let inside = false;
   for (
     let index = 0, previous = polygon.length - 1;
@@ -114,4 +128,23 @@ function contains(
       inside = !inside;
   }
   return inside;
+}
+
+const CONTAINMENT_EPSILON = 1e-7;
+
+function pointOnSegment(
+  start: ScreenPoint,
+  end: ScreenPoint,
+  point: ScreenPoint,
+): boolean {
+  const cross =
+    (point.x - start.x) * (end.y - start.y) -
+    (point.y - start.y) * (end.x - start.x);
+  if (Math.abs(cross) > CONTAINMENT_EPSILON) return false;
+  return (
+    point.x >= Math.min(start.x, end.x) - CONTAINMENT_EPSILON &&
+    point.x <= Math.max(start.x, end.x) + CONTAINMENT_EPSILON &&
+    point.y >= Math.min(start.y, end.y) - CONTAINMENT_EPSILON &&
+    point.y <= Math.max(start.y, end.y) + CONTAINMENT_EPSILON
+  );
 }

@@ -17,6 +17,11 @@ describe("mesh diagnostics", () => {
     });
   });
 
+  it("memoizes diagnostics for an unchanged mesh revision", () => {
+    const mesh = createPlaneMesh().toMeshData();
+    expect(diagnoseMesh(mesh)).toBe(diagnoseMesh(mesh));
+  });
+
   it("returns normalized face normal visualization segments", () => {
     const segments = collectFaceNormalSegments(createPlaneMesh().toMeshData());
     expect(segments).toHaveLength(1);

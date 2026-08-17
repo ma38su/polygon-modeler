@@ -16,6 +16,7 @@ import type {
   Vector3Value,
 } from "../document/types";
 import { EditableMesh } from "../mesh/EditableMesh";
+import { repairPolygonWinding } from "../mesh/repairOperations";
 import { triangulate } from "../mesh/triangulate";
 
 export interface ImportedMesh {
@@ -156,7 +157,10 @@ function geometryToEditableMesh(
   }
   geometry.dispose();
   if (!polygons.length) throw new Error("読み込める三角形がありません");
-  return EditableMesh.fromPolygons(positions, polygons);
+  return EditableMesh.fromPolygons(
+    positions,
+    repairPolygonWinding(positions, polygons),
+  );
 }
 
 export async function importGlb(data: ArrayBuffer): Promise<ImportedMesh[]> {

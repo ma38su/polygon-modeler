@@ -2,7 +2,11 @@ import { describe, expect, it } from "vitest";
 import { EditableMesh } from "./EditableMesh";
 import { createBoxMesh } from "./primitives/box";
 import { diagnoseMesh } from "./meshDiagnostics";
-import { mergeByDistance, recalculateFaceNormals } from "./repairOperations";
+import {
+  mergeByDistance,
+  recalculateFaceNormals,
+  repairPolygonWinding,
+} from "./repairOperations";
 
 describe("mesh repair operations", () => {
   it("welds nearby vertices and creates shared topology", () => {
@@ -43,5 +47,35 @@ describe("mesh repair operations", () => {
     )!;
     expect(top).toBeDefined();
     expect(top).toEqual([3, 7, 6, 2]);
+  });
+
+  it("repairs inconsistent adjacent open polygons before mesh construction", () => {
+    const positions = [
+      { x: 0, y: 0, z: 0 },
+      { x: 1, y: 0, z: 0 },
+      { x: 0, y: 1, z: 0 },
+      { x: 1, y: 1, z: 0 },
+    ];
+    const faces = repairPolygonWinding(positions, [
+      [0, 1, 2],
+      [1, 2, 3],
+    ]);
+    expect(() => EditableMesh.fromPolygons(positions, faces)).not.toThrow();
+    expect(faces[1]).toEqual([3, 2, 1]);
+  });
+
+  it("handles many disconnected faces without quadratic component scans", () => {
+    const faceCount = 2_000;
+    const positions = Array.from({ length: faceCount * 3 }, (_, index) => ({
+      x: index,
+      y: index % 3 === 1 ? 1 : 0,
+      z: 0,
+    }));
+    const polygons = Array.from({ length: faceCount }, (_, index) => [
+      index * 3,
+      index * 3 + 1,
+      index * 3 + 2,
+    ]);
+    expect(repairPolygonWinding(positions, polygons)).toHaveLength(faceCount);
   });
 });

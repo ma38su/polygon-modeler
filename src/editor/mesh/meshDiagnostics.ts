@@ -14,7 +14,20 @@ export interface FaceNormalSegment {
   readonly normal: Vector3Value;
 }
 
+const diagnosticsCache = new WeakMap<
+  MeshData,
+  { revision: number; value: MeshDiagnostics }
+>();
+
 export function diagnoseMesh(mesh: MeshData): MeshDiagnostics {
+  const cached = diagnosticsCache.get(mesh);
+  if (cached?.revision === mesh.revision) return cached.value;
+  const value = calculateMeshDiagnostics(mesh);
+  diagnosticsCache.set(mesh, { revision: mesh.revision, value });
+  return value;
+}
+
+function calculateMeshDiagnostics(mesh: MeshData): MeshDiagnostics {
   const edgeUse = new Map<string, number>();
   const usedVertices = new Set<number>();
   let degenerateFaces = 0;
