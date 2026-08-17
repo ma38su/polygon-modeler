@@ -24,7 +24,11 @@ import {
 import { ViewportCanvas } from "./viewport/ViewportCanvas";
 import type { SelectionGesture } from "./viewport/ViewportCanvas";
 import type { ViewportStatus } from "./viewport/Viewport";
-import type { TransformMode } from "./viewport/Viewport";
+import type {
+  AxisConstraint,
+  SnapSettings,
+  TransformMode,
+} from "./viewport/Viewport";
 import {
   DEFAULT_DISPLAY_LAYERS,
   type DisplayLayers,
@@ -56,6 +60,12 @@ export default function App() {
     useState<TransformMode>("translate");
   const [selectionGesture, setSelectionGesture] =
     useState<SelectionGesture>("click");
+  const [axisConstraint, setAxisConstraint] = useState<AxisConstraint>("all");
+  const [snapSettings, setSnapSettings] = useState<SnapSettings>({
+    grid: false,
+    vertex: false,
+    gridSize: 0.5,
+  });
   const [displayLayers, setDisplayLayers] = useState<DisplayLayers>({
     ...DEFAULT_DISPLAY_LAYERS,
   });
@@ -83,6 +93,7 @@ export default function App() {
   );
   useEditorShortcuts(editor, {
     activateTransformMode,
+    setAxisConstraint,
     showHelp: openShortcutHelp,
   });
   useEffect(() => {
@@ -311,6 +322,10 @@ export default function App() {
             onToggleDisplayLayer={toggleDisplayLayer}
             projection={projection}
             onProjectionChange={setProjection}
+            axisConstraint={axisConstraint}
+            onAxisConstraintChange={setAxisConstraint}
+            snapSettings={snapSettings}
+            onSnapSettingsChange={setSnapSettings}
           />
           <ViewportCanvas
             projection={projection}
@@ -326,6 +341,8 @@ export default function App() {
             onPick={handlePick}
             selectionGesture={selectionGesture}
             onPickRegion={handleRegionPick}
+            axisConstraint={axisConstraint}
+            snapSettings={snapSettings}
           />
           {contextMenu && (
             <div
@@ -403,6 +420,14 @@ export default function App() {
         </span>
         <span>選択: {snapshot.selectionItems.length}</span>
         <span>
+          軸: {axisConstraint === "all" ? "XYZ" : axisConstraint.toUpperCase()}
+        </span>
+        <span>
+          スナップ: {snapSettings.grid ? "Grid " : ""}
+          {snapSettings.vertex ? "Vertex" : ""}
+          {!snapSettings.grid && !snapSettings.vertex ? "OFF" : ""}
+        </span>
+        <span>
           頂点:{" "}
           {snapshot.objects.reduce(
             (sum, object) => sum + object.mesh.positions.length / 3,
@@ -442,6 +467,7 @@ export default function App() {
               {[
                 ["1 / 2 / 3", "Vertex / Edge / Face"],
                 ["G / R / S", "移動 / 回転 / 拡大縮小"],
+                ["X / Y / Z", "操作軸を制限"],
                 ["⌘/Ctrl A", "すべて選択"],
                 ["Alt A", "選択解除"],
                 ["Delete", "削除"],

@@ -37,6 +37,7 @@ import type {
 } from "../editor/selection/SelectionManager";
 import { SELECTION_MODES } from "../editor/selection/SelectionManager";
 import type { DisplayLayers } from "./displayLayers";
+import { findVertexSnap } from "./snapping";
 import {
   canUseWebGpu,
   getRendererPreference,
@@ -54,6 +55,12 @@ export interface ViewportStatus {
 type StatusListener = (status: ViewportStatus) => void;
 type Renderer = WebGLRenderer | WebGpuRenderer;
 export type TransformMode = "translate" | "rotate" | "scale";
+export type AxisConstraint = "all" | "x" | "y" | "z";
+export interface SnapSettings {
+  readonly grid: boolean;
+  readonly vertex: boolean;
+  readonly gridSize: number;
+}
 export type TransformCommitListener = (
   id: ObjectId,
   before: TransformValue,
@@ -94,6 +101,8 @@ export class Viewport {
   #controls?: OrbitControls;
   #transformControls?: TransformControls;
   #transformMode: TransformMode = "translate";
+  #axisConstraint: AxisConstraint = "all";
+  #snapSettings: SnapSettings = { grid: false, vertex: false, gridSize: 0.5 };
   #regionSelectionActive = false;
   #transformCommitListener?: TransformCommitListener;
   #elementTransformCommitListener?: ElementTransformCommitListener;
@@ -222,6 +231,21 @@ export class Viewport {
     this.#attachSelectedObject();
   }
 
+  setAxisConstraint(constraint: AxisConstraint): void {
+    this.#axisConstraint = constraint;
+    if (!this.#transformControls) return;
+    this.#transformControls.showX = constraint === "all" || constraint === "x";
+    this.#transformControls.showY = constraint === "all" || constraint === "y";
+    this.#transformControls.showZ = constraint === "all" || constraint === "z";
+  }
+
+  setSnapSettings(settings: SnapSettings): void {
+    this.#snapSettings = settings;
+    this.#transformControls?.setTranslationSnap(
+      settings.grid ? settings.gridSize : null,
+    );
+  }
+
   setRegionSelectionActive(active: boolean): void {
     if (this.#regionSelectionActive === active) return;
     this.#regionSelectionActive = active;
@@ -337,6 +361,9 @@ export class Viewport {
       this.#renderer.domElement,
     );
     controls.setMode(this.#transformMode);
+    controls.setTranslationSnap(
+      this.#snapSettings.grid ? this.#snapSettings.gridSize : null,
+    );
     controls.addEventListener("dragging-changed", (event) => {
       if (this.#controls) this.#controls.enabled = !event.value;
     });
@@ -344,6 +371,7 @@ export class Viewport {
     controls.addEventListener("objectChange", this.#handleTransformPreview);
     controls.addEventListener("mouseUp", this.#handleTransformEnd);
     this.#transformControls = controls;
+    this.setAxisConstraint(this.#axisConstraint);
     this.#scene.add(controls.getHelper());
   }
 
@@ -448,6 +476,8 @@ export class Viewport {
       this.#elementPreview.size === 0
     )
       return;
+    if (this.#transformMode === "translate" && this.#snapSettings.vertex)
+      this.#snapElementPivotToVertex();
     const worldTransform = this.#elementWorldTransform();
     for (const object of this.#objects) {
       const preview = this.#elementPreview.get(object.id);
@@ -496,6 +526,33 @@ export class Viewport {
     const initial = new Matrix4().makeTranslation(before.x, before.y, before.z);
     this.#elementPivot.updateMatrix();
     return this.#elementPivot.matrix.clone().multiply(initial.invert());
+  }
+
+  #snapElementPivotToVertex(): void {
+    const selectedByObject = new Map<ObjectId, Set<number>>();
+    for (const object of this.#objects)
+      selectedByObject.set(object.id, this.#selectedVertexIndices(object));
+    const candidates: Vector3[] = [];
+    for (const object of this.#objects) {
+      const mesh = this.#geometryAdapter.getMesh(object.id);
+      if (!mesh || !object.visible) continue;
+      mesh.updateWorldMatrix(true, false);
+      const selected = selectedByObject.get(object.id)!;
+      object.mesh.vertexIds.forEach((_, index) => {
+        if (selected.has(index)) return;
+        const point = new Vector3()
+          .fromArray(object.mesh.positions, index * 3)
+          .applyMatrix4(mesh.matrixWorld);
+        candidates.push(point);
+      });
+    }
+    const snapped = findVertexSnap(
+      this.#elementPivot.position,
+      candidates,
+      this.#axisConstraint,
+      0.3,
+    );
+    if (snapped) this.#elementPivot.position.copy(snapped);
   }
 
   #elementTransformUpdates(): ElementTransformUpdate[] {

@@ -2,7 +2,9 @@ import { useEffect, useRef, useState } from "react";
 import { AlertTriangle, RefreshCw } from "lucide-react";
 import {
   Viewport,
+  type AxisConstraint,
   type ElementTransformCommitListener,
+  type SnapSettings,
   type TransformCommitListener,
   type TransformMode,
   type ViewportStatus,
@@ -31,6 +33,8 @@ export interface ViewportCanvasProps {
   onPick(item: SelectionItem | undefined, additive: boolean): void;
   selectionGesture: SelectionGesture;
   onPickRegion(items: readonly SelectionItem[], additive: boolean): void;
+  axisConstraint: AxisConstraint;
+  snapSettings: SnapSettings;
 }
 
 export function ViewportCanvas({
@@ -47,6 +51,8 @@ export function ViewportCanvas({
   onPick,
   selectionGesture,
   onPickRegion,
+  axisConstraint,
+  snapSettings,
 }: ViewportCanvasProps) {
   const hostRef = useRef<HTMLDivElement>(null);
   const viewportRef = useRef<Viewport>(null);
@@ -83,6 +89,14 @@ export function ViewportCanvas({
     [displayLayers, objects, selectedObjectIds, selectionItems, selectionModes],
   );
   useEffect(
+    () => viewportRef.current?.setAxisConstraint(axisConstraint),
+    [axisConstraint],
+  );
+  useEffect(
+    () => viewportRef.current?.setSnapSettings(snapSettings),
+    [snapSettings],
+  );
+  useEffect(
     () => viewportRef.current?.setPicking(selectionModes, onPick),
     [selectionModes, onPick],
   );
@@ -108,6 +122,9 @@ export function ViewportCanvas({
       data-display-edges={displayLayers.edges}
       data-display-faces={displayLayers.faces}
       data-selection-gesture={selectionGesture}
+      data-axis-constraint={axisConstraint}
+      data-grid-snap={snapSettings.grid}
+      data-vertex-snap={snapSettings.vertex}
       tabIndex={0}
       onPointerDown={(event) => event.currentTarget.focus()}
       onPointerDownCapture={(event) => {

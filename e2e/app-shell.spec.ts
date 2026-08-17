@@ -71,6 +71,27 @@ test("shows the empty editor shell", async ({ page }) => {
     "false",
   );
   await displayLayers.getByRole("button", { name: "Face" }).click();
+  const snapControls = page.getByLabel("スナップと軸制限");
+  await snapControls.getByRole("button", { name: "Grid" }).click();
+  await snapControls.getByRole("button", { name: "Vertex" }).click();
+  await snapControls.getByRole("button", { name: "X", exact: true }).click();
+  await expect(page.getByTestId("viewport-canvas")).toHaveAttribute(
+    "data-grid-snap",
+    "true",
+  );
+  await expect(page.getByTestId("viewport-canvas")).toHaveAttribute(
+    "data-vertex-snap",
+    "true",
+  );
+  await expect(page.getByTestId("viewport-canvas")).toHaveAttribute(
+    "data-axis-constraint",
+    "x",
+  );
+  await page.keyboard.press("y");
+  await expect(page.getByTestId("viewport-canvas")).toHaveAttribute(
+    "data-axis-constraint",
+    "y",
+  );
   const selectionModes = page.getByLabel("選択モード");
   await expect(
     selectionModes.getByRole("button", { name: "Object" }),
@@ -190,16 +211,15 @@ test("selects vertices with box and lasso gestures", async ({ page }) => {
 
   await page.keyboard.press("Alt+A");
   await page.getByRole("button", { name: "投げ縄選択" }).click();
-  const center = {
-    x: bounds!.x + bounds!.width / 2,
-    y: bounds!.y + bounds!.height / 2,
-  };
-  await page.mouse.move(center.x - 280, center.y - 240);
+  await page.mouse.move(bounds!.x + 120, bounds!.y + 150);
   await page.mouse.down();
-  await page.mouse.move(center.x + 280, center.y - 240);
-  await page.mouse.move(center.x + 280, center.y + 240);
-  await page.mouse.move(center.x - 280, center.y + 240);
-  await page.mouse.move(center.x - 280, center.y - 240);
+  await page.mouse.move(bounds!.x + bounds!.width - 120, bounds!.y + 150);
+  await page.mouse.move(
+    bounds!.x + bounds!.width - 120,
+    bounds!.y + bounds!.height - 120,
+  );
+  await page.mouse.move(bounds!.x + 120, bounds!.y + bounds!.height - 120);
+  await page.mouse.move(bounds!.x + 120, bounds!.y + 150);
   await page.mouse.up();
   await expect(page.getByText("選択: 8")).toBeVisible();
 });

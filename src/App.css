@@ -318,6 +318,47 @@ kbd {
   font-size: var(--font-size-2xs);
   pointer-events: none;
 }
+.snap-toolbar {
+  position: absolute;
+  z-index: 2;
+  top: 82px;
+  left: 164px;
+  display: flex;
+  align-items: center;
+  gap: var(--space-0-5);
+  padding: var(--space-1);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  background: color-mix(in srgb, var(--surface-1), transparent 8%);
+  box-shadow: var(--shadow-sm);
+}
+.snap-toolbar > span {
+  padding-left: var(--space-1-5);
+  color: var(--text-subtle);
+  font-size: var(--font-size-2xs);
+}
+.snap-toolbar button {
+  display: flex;
+  align-items: center;
+  min-width: var(--control-sm);
+  min-height: var(--control-sm);
+  justify-content: center;
+  gap: var(--space-1);
+  padding: 0 var(--space-2);
+  border: 0;
+  border-radius: var(--radius-sm);
+  color: var(--text-muted);
+  background: transparent;
+  font-size: var(--font-size-xs);
+}
+.snap-toolbar button.active {
+  color: var(--accent-strong);
+  background: var(--accent-muted);
+}
+.snap-toolbar svg {
+  width: var(--icon-xs);
+  height: var(--icon-xs);
+}
 .selection-mode-bar button {
   min-height: var(--control-sm);
   padding: 0 var(--space-2);

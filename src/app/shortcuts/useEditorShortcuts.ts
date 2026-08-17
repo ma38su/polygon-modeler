@@ -1,16 +1,17 @@
 import { useEffect } from "react";
 import type { Editor } from "../../editor/Editor";
 import { SELECTION_MODES } from "../../editor/selection/SelectionManager";
-import type { TransformMode } from "../../viewport/Viewport";
+import type { AxisConstraint, TransformMode } from "../../viewport/Viewport";
 
 interface ShortcutOptions {
   activateTransformMode(mode: TransformMode): void;
+  setAxisConstraint(constraint: AxisConstraint): void;
   showHelp(): void;
 }
 
 export function useEditorShortcuts(
   editor: Editor,
-  { activateTransformMode, showHelp }: ShortcutOptions,
+  { activateTransformMode, setAxisConstraint, showHelp }: ShortcutOptions,
 ): void {
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
@@ -37,6 +38,8 @@ export function useEditorShortcuts(
         activateTransformMode("rotate");
       } else if (event.key.toLowerCase() === "s") {
         activateTransformMode("scale");
+      } else if (["x", "y", "z"].includes(event.key.toLowerCase())) {
+        setAxisConstraint(event.key.toLowerCase() as AxisConstraint);
       } else if (event.key === "?") {
         showHelp();
       } else if (event.key === "Delete" || event.key === "Backspace") {
@@ -46,5 +49,5 @@ export function useEditorShortcuts(
     };
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
-  }, [activateTransformMode, editor, showHelp]);
+  }, [activateTransformMode, editor, setAxisConstraint, showHelp]);
 }

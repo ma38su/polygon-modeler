@@ -1,9 +1,10 @@
-import { Box, BoxIcon, Eye, EyeOff } from "lucide-react";
+import { Box, BoxIcon, Eye, EyeOff, Grid3X3, Magnet } from "lucide-react";
 import {
   SELECTION_MODES,
   type SelectionMode,
 } from "../../editor/selection/SelectionManager";
 import type { DisplayLayers } from "../../viewport/displayLayers";
+import type { AxisConstraint, SnapSettings } from "../../viewport/Viewport";
 
 const selectionLabels: Record<SelectionMode, string> = {
   vertex: "Vertex",
@@ -30,6 +31,10 @@ interface ViewportControlsProps {
   onToggleDisplayLayer(layer: keyof DisplayLayers): void;
   projection: "perspective" | "orthographic";
   onProjectionChange(projection: "perspective" | "orthographic"): void;
+  axisConstraint: AxisConstraint;
+  onAxisConstraintChange(constraint: AxisConstraint): void;
+  snapSettings: SnapSettings;
+  onSnapSettingsChange(settings: SnapSettings): void;
 }
 
 export function ViewportControls({
@@ -39,6 +44,10 @@ export function ViewportControls({
   onToggleDisplayLayer,
   projection,
   onProjectionChange,
+  axisConstraint,
+  onAxisConstraintChange,
+  snapSettings,
+  onSnapSettingsChange,
 }: ViewportControlsProps) {
   return (
     <>
@@ -96,6 +105,53 @@ export function ViewportControls({
           <Box aria-hidden="true" />
           正投影
         </button>
+      </div>
+      <div className="snap-toolbar" aria-label="スナップと軸制限">
+        <button
+          type="button"
+          className={snapSettings.grid ? "active" : ""}
+          aria-pressed={snapSettings.grid}
+          title={`グリッドへ${snapSettings.gridSize}単位でスナップ`}
+          onClick={() =>
+            onSnapSettingsChange({
+              ...snapSettings,
+              grid: !snapSettings.grid,
+            })
+          }
+        >
+          <Grid3X3 aria-hidden="true" />
+          Grid
+        </button>
+        <button
+          type="button"
+          className={snapSettings.vertex ? "active" : ""}
+          aria-pressed={snapSettings.vertex}
+          title="未選択の頂点へスナップ"
+          onClick={() =>
+            onSnapSettingsChange({
+              ...snapSettings,
+              vertex: !snapSettings.vertex,
+            })
+          }
+        >
+          <Magnet aria-hidden="true" />
+          Vertex
+        </button>
+        <span>軸</span>
+        {(["x", "y", "z"] as const).map((axis) => (
+          <button
+            type="button"
+            key={axis}
+            className={axisConstraint === axis ? "active" : ""}
+            aria-pressed={axisConstraint === axis}
+            title={`${axis.toUpperCase()}軸に制限`}
+            onClick={() =>
+              onAxisConstraintChange(axisConstraint === axis ? "all" : axis)
+            }
+          >
+            {axis.toUpperCase()}
+          </button>
+        ))}
       </div>
     </>
   );
