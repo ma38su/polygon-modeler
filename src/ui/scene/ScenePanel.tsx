@@ -65,6 +65,9 @@ export function ScenePanel({
   const selectedObject = snapshot.objects.find((object) =>
     snapshot.selectedObjectIds.has(object.id),
   );
+  const selectedObjects = snapshot.objects.filter((object) =>
+    snapshot.selectedObjectIds.has(object.id),
+  );
   const diagnostics = useMemo(
     () => (selectedObject ? diagnoseMesh(selectedObject.mesh) : undefined),
     // Snapshots may be recreated for selection/UI changes while mesh data is unchanged.
@@ -238,7 +241,11 @@ export function ScenePanel({
           />
         ) : selectedObject ? (
           <>
-            <TransformInspector editor={editor} object={selectedObject} />
+            <TransformInspector
+              editor={editor}
+              objects={selectedObjects}
+              orientation={transformOrientation}
+            />
             <MaterialInspector editor={editor} object={selectedObject} />
             <div className="mesh-diagnostics" aria-label="メッシュ診断">
               <h3>メッシュ診断</h3>

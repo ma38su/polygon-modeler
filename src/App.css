@@ -655,6 +655,12 @@ kbd {
   padding: 0;
   border: 0;
 }
+.inspector-hint {
+  margin: 0 0 var(--space-2);
+  color: var(--text-muted);
+  font-size: var(--font-size-xs);
+  line-height: var(--line-height-normal);
+}
 .inspector-section {
   margin: 0 0 var(--space-3);
   padding: var(--space-2);

@@ -3,7 +3,10 @@ import { describe, expect, it } from "vitest";
 import { ModelObject } from "../document/ModelObject";
 import type { ObjectId } from "../document/types";
 import { createPlaneMesh } from "../mesh/primitives/plane";
-import { numericElementTransformUpdates } from "./numericElementTransform";
+import {
+  numericElementTransformUpdates,
+  numericObjectTransformUpdates,
+} from "./numericElementTransform";
 
 const worldMatrix = (object: ReturnType<ModelObject["toSnapshot"]>) =>
   new Matrix4().compose(
@@ -27,6 +30,32 @@ const worldMatrix = (object: ReturnType<ModelObject["toSnapshot"]>) =>
   );
 
 describe("numeric element transform frames", () => {
+  it("rotates multiple transformed objects around their common world pivot", () => {
+    const objects = [-2, 2].map((x, index) => {
+      const object = new ModelObject(
+        `object-${index + 1}` as ObjectId,
+        `Object ${index + 1}`,
+        createPlaneMesh(),
+      );
+      object.transform = {
+        position: { x, y: 0, z: 0 },
+        rotation: { x: 0.2 * index, y: 0.3, z: 0 },
+        scale: { x: 1 + index, y: 1, z: 0.5 },
+      };
+      return object.toSnapshot();
+    });
+    const updates = numericObjectTransformUpdates(
+      objects,
+      new Set(objects.map((object) => object.id)),
+      "rotate",
+      { x: 0, y: 0, z: Math.PI / 2 },
+      "world",
+    );
+    expect(updates[0]!.transform.position.x).toBeCloseTo(0);
+    expect(updates[0]!.transform.position.y).toBeCloseTo(-2);
+    expect(updates[1]!.transform.position.x).toBeCloseTo(0);
+    expect(updates[1]!.transform.position.y).toBeCloseTo(2);
+  });
   it("interprets numeric translation in the first object's local axes", () => {
     const first = new ModelObject(
       "object-1" as ObjectId,

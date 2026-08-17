@@ -1,5 +1,10 @@
 import { Euler, Matrix3, Matrix4, Quaternion, Vector3 } from "three";
-import type { ModelObjectSnapshot, Vector3Value } from "../document/types";
+import type {
+  ModelObjectSnapshot,
+  ObjectId,
+  TransformValue,
+  Vector3Value,
+} from "../document/types";
 import type { SelectionItem } from "../selection/SelectionManager";
 import type { TransformOrientation } from "../../viewport/transform/elementSelection";
 import type {
@@ -39,6 +44,49 @@ export function numericElementTransformUpdates(
     });
   }
   return updates;
+}
+
+export function numericObjectTransformUpdates(
+  objects: readonly ModelObjectSnapshot[],
+  selectedIds: ReadonlySet<ObjectId>,
+  mode: TransformMode,
+  values: Vector3Value,
+  orientation: TransformOrientation,
+): readonly { id: ObjectId; transform: TransformValue }[] {
+  const selected = objects.filter((object) => selectedIds.has(object.id));
+  if (!selected.length) return [];
+  const pivot = new Vector3();
+  selected.forEach((object) =>
+    pivot.add(
+      new Vector3(
+        object.transform.position.x,
+        object.transform.position.y,
+        object.transform.position.z,
+      ).multiplyScalar(1 / selected.length),
+    ),
+  );
+  const frameRotation =
+    orientation === "world"
+      ? new Quaternion()
+      : new Quaternion().setFromEuler(toEuler(selected[0]!.transform.rotation));
+  const delta = operationMatrix(mode, values, pivot, frameRotation);
+  return selected.map((object) => {
+    const current = matrixFromTransform(object.transform);
+    const result = delta.clone().multiply(current);
+    const position = new Vector3();
+    const rotation = new Quaternion();
+    const scale = new Vector3();
+    result.decompose(position, rotation, scale);
+    const euler = new Euler().setFromQuaternion(rotation, "XYZ");
+    return {
+      id: object.id,
+      transform: {
+        position: fromVector(position),
+        rotation: { x: euler.x, y: euler.y, z: euler.z },
+        scale: fromVector(scale),
+      },
+    };
+  });
 }
 
 function deltaMatrix(
@@ -132,6 +180,57 @@ function selectionFrame(
     ),
   };
 }
+
+function operationMatrix(
+  mode: TransformMode,
+  values: Vector3Value,
+  pivot: Vector3,
+  frameRotation: Quaternion,
+): Matrix4 {
+  if (mode === "translate") {
+    const translation = new Vector3(
+      values.x,
+      values.y,
+      values.z,
+    ).applyQuaternion(frameRotation);
+    return new Matrix4().makeTranslation(
+      translation.x,
+      translation.y,
+      translation.z,
+    );
+  }
+  const frame = new Matrix4().compose(
+    pivot,
+    frameRotation,
+    new Vector3(1, 1, 1),
+  );
+  const operation =
+    mode === "rotate"
+      ? new Matrix4().makeRotationFromEuler(toEuler(values))
+      : new Matrix4().makeScale(values.x, values.y, values.z);
+  const inverseFrame = frame.clone().invert();
+  return frame.multiply(operation).multiply(inverseFrame);
+}
+
+function matrixFromTransform(transform: TransformValue): Matrix4 {
+  return new Matrix4().compose(
+    new Vector3(
+      transform.position.x,
+      transform.position.y,
+      transform.position.z,
+    ),
+    new Quaternion().setFromEuler(toEuler(transform.rotation)),
+    new Vector3(transform.scale.x, transform.scale.y, transform.scale.z),
+  );
+}
+
+const toEuler = (value: Vector3Value) =>
+  new Euler(value.x, value.y, value.z, "XYZ");
+const fromVector = (value: Vector3): Vector3Value => ({
+  x: value.x,
+  y: value.y,
+  z: value.z,
+});
 
 function objectMatrix(object: ModelObjectSnapshot): Matrix4 {
   const { position, rotation, scale } = object.transform;

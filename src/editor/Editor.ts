@@ -70,7 +70,10 @@ import {
 } from "./boolean/booleanOperations";
 import type { TransformOrientation } from "../viewport/transform/elementSelection";
 import type { TransformMode } from "../viewport/Viewport";
-import { numericElementTransformUpdates } from "./transform/numericElementTransform";
+import {
+  numericElementTransformUpdates,
+  numericObjectTransformUpdates,
+} from "./transform/numericElementTransform";
 type Listener = () => void;
 const clampUnit = (value: number) => Math.min(1, Math.max(0, value));
 export class Editor {
@@ -449,6 +452,31 @@ export class Editor {
     if (!object) return;
     this.history.execute(
       new TransformObjectCommand(id, object.transform, transform),
+      this.document,
+    );
+    this.#commit(true);
+  }
+  transformSelectedObjectsInFrame(
+    mode: TransformMode,
+    values: Vector3Value,
+    orientation: TransformOrientation,
+  ): void {
+    const updates = numericObjectTransformUpdates(
+      this.getSnapshot().objects,
+      this.#selectedObjectIds,
+      mode,
+      values,
+      orientation,
+    );
+    const commands = updates.flatMap(({ id, transform }) => {
+      const object = this.document.getObject(id);
+      return object
+        ? [new TransformObjectCommand(id, object.transform, transform)]
+        : [];
+    });
+    if (!commands.length) return;
+    this.history.execute(
+      new CompositeCommand("オブジェクトを数値変形", commands),
       this.document,
     );
     this.#commit(true);
