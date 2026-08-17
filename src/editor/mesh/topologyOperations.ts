@@ -1,5 +1,6 @@
 import { EditableMesh } from "./EditableMesh";
 import type { EdgeId, FaceId, Vector3Value, VertexId } from "../document/types";
+import { collectQuadEdgeLoop, edgePairKey } from "./edgeLoop";
 
 const vector = (positions: readonly number[], index: number): Vector3Value => ({
   x: positions[index * 3]!,
@@ -204,6 +205,80 @@ export function bevelElements(
       polygons.push(
         neighbors.map((neighbor) => cut(vertex, neighbor)).reverse(),
       );
+  }
+  return EditableMesh.fromPolygons(
+    Array.from({ length: positions.length / 3 }, (_, index) =>
+      vector(positions, index),
+    ),
+    polygons,
+  );
+}
+
+export function loopCut(
+  mesh: EditableMesh,
+  edgeIds: ReadonlySet<EdgeId>,
+  factor = 0.5,
+): EditableMesh {
+  if (!Number.isFinite(factor) || factor <= 0 || factor >= 1)
+    throw new Error("ループカット位置は0より大きく1未満で指定してください。");
+  const loop = new Set(collectQuadEdgeLoop(mesh, edgeIds));
+  if (!loop.size) return mesh.clone();
+  const data = mesh.toMeshData();
+  const positions = [...data.positions];
+  const vertexIndex = new Map(data.vertexIds.map((id, index) => [id, index]));
+  const edgeByPair = new Map<string, EdgeId>();
+  const midpointByEdge = new Map<EdgeId, number>();
+  for (const edge of mesh.edges.values()) {
+    const halfEdge = mesh.halfEdges.get(edge.halfEdges[0]!)!;
+    edgeByPair.set(edgePairKey(halfEdge.origin, halfEdge.destination), edge.id);
+    if (!loop.has(edge.id)) continue;
+    const a = mesh.vertices.get(halfEdge.origin)!.position;
+    const b = mesh.vertices.get(halfEdge.destination)!.position;
+    midpointByEdge.set(edge.id, positions.length / 3);
+    positions.push(
+      a.x + (b.x - a.x) * factor,
+      a.y + (b.y - a.y) * factor,
+      a.z + (b.z - a.z) * factor,
+    );
+  }
+  const polygons: number[][] = [];
+  for (const face of mesh.faces.values()) {
+    const sides = face.vertices.map((vertex, index) =>
+      edgeByPair.get(
+        edgePairKey(vertex, face.vertices[(index + 1) % face.vertices.length]!),
+      ),
+    );
+    const hits = sides.flatMap((id, index) =>
+      id && loop.has(id) ? [index] : [],
+    );
+    if (
+      face.vertices.length !== 4 ||
+      hits.length !== 2 ||
+      (hits[0]! + 2) % 4 !== hits[1]
+    ) {
+      polygons.push(face.vertices.map((id) => vertexIndex.get(id)!));
+      continue;
+    }
+    const cursor = hits[0]!;
+    const [a, b, c, d] = [0, 1, 2, 3].map(
+      (offset) => face.vertices[(cursor + offset) % 4]!,
+    );
+    const firstMidpoint = midpointByEdge.get(sides[cursor]!)!;
+    const oppositeMidpoint = midpointByEdge.get(sides[(cursor + 2) % 4]!)!;
+    polygons.push(
+      [
+        firstMidpoint,
+        vertexIndex.get(b)!,
+        vertexIndex.get(c)!,
+        oppositeMidpoint,
+      ],
+      [
+        vertexIndex.get(a)!,
+        firstMidpoint,
+        oppositeMidpoint,
+        vertexIndex.get(d)!,
+      ],
+    );
   }
   return EditableMesh.fromPolygons(
     Array.from({ length: positions.length / 3 }, (_, index) =>

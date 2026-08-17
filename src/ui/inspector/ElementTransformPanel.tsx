@@ -3,6 +3,7 @@ import type { Editor } from "../../editor/Editor";
 import type { ModelObjectSnapshot } from "../../editor/document/types";
 import {
   Combine,
+  BetweenHorizontalEnd,
   Component,
   FlipVertical2,
   Layers3,
@@ -253,6 +254,13 @@ export function ElementTransformPanel({
         >
           <Scissors aria-hidden="true" />
           分割
+        </button>
+        <button
+          type="button"
+          onClick={() => run(() => editor.loopCutSelectedEdges())}
+        >
+          <BetweenHorizontalEnd aria-hidden="true" />
+          ループカット
         </button>
         <button
           type="button"

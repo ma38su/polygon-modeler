@@ -42,6 +42,7 @@ import {
   insetFaces,
   flipFaces,
   mergeVertices,
+  loopCut,
   splitEdge,
   splitFace,
 } from "./mesh/topologyOperations";
@@ -615,6 +616,19 @@ export class Editor {
       );
       return edge ? splitEdge(mesh, edge.elementId as EdgeId) : mesh.clone();
     });
+  }
+  loopCutSelectedEdges(factor = 0.5): void {
+    this.#applyTopology("ループカット", (mesh, items) =>
+      loopCut(
+        mesh,
+        new Set(
+          items
+            .map((item) => item.elementId as EdgeId)
+            .filter((id) => mesh.edges.has(id)),
+        ),
+        factor,
+      ),
+    );
   }
   flipSelectedFaces(): void {
     this.#applyTopology("面を反転", (mesh, items) =>

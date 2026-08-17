@@ -6,6 +6,7 @@ import {
   extrudeFaces,
   flipFaces,
   insetFaces,
+  loopCut,
   mergeVertices,
   splitEdge,
   splitFace,
@@ -60,6 +61,13 @@ describe("topology operations", () => {
       beveledVertex.vertices.size,
     );
     expect(validateMesh(beveledEdge).valid).toBe(true);
+  });
+  it("cuts a quad edge loop through a box", () => {
+    const mesh = createBoxMesh();
+    const result = loopCut(mesh, new Set([[...mesh.edges.keys()][0]!]), 0.5);
+    expect(result.vertices.size).toBe(12);
+    expect(result.faces.size).toBe(10);
+    expect(validateMesh(result).valid).toBe(true);
   });
   it("splits a face into triangles", () => {
     const mesh = createPlaneMesh();

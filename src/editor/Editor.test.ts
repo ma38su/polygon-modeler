@@ -222,6 +222,17 @@ describe("Editor", () => {
     editor.selectEdgeLoop();
     expect(editor.getSnapshot().selectionItems).toHaveLength(4);
   });
+  it("loop cuts selected quad edge rings as one undoable operation", () => {
+    const editor = new Editor();
+    const objectId = editor.createBox();
+    editor.setSelectionMode("edge");
+    const edgeId = editor.getSnapshot().objects[0]!.mesh.edges[0]!.id;
+    editor.selectElement({ objectId, elementId: edgeId });
+    editor.loopCutSelectedEdges();
+    expect(editor.getSnapshot().objects[0]!.mesh.faces).toHaveLength(10);
+    editor.undo();
+    expect(editor.getSnapshot().objects[0]!.mesh.faces).toHaveLength(6);
+  });
   it("previews numeric transforms without changing document history", () => {
     const editor = new Editor();
     const objectId = editor.createBox();
