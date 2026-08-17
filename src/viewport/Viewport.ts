@@ -387,6 +387,7 @@ export class Viewport {
       this.#renderer.domElement,
     );
     controls.setMode(this.#transformMode);
+    controls.setSize(0.8);
     controls.addEventListener("dragging-changed", (event) => {
       if (this.#controls) this.#controls.enabled = !event.value;
     });
