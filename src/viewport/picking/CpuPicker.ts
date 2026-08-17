@@ -22,7 +22,13 @@ export class CpuPicker {
     adapter: RenderGeometryAdapter,
     objects: readonly ModelObjectSnapshot[],
   ):
-    | { objectId: ObjectId; faceId: FaceId; edgeIndex: number; factor: number }
+    | {
+        objectId: ObjectId;
+        faceId: FaceId;
+        edgeIndex: number;
+        factor: number;
+        worldPosition: { x: number; y: number; z: number };
+      }
     | undefined {
     const pointer = new Vector2(
       ((x - bounds.left) / bounds.width) * 2 - 1,
@@ -72,11 +78,25 @@ export class CpuPicker {
       const distance = localHit.distanceTo(from.addScaledVector(delta, factor));
       if (distance < best.distance) best = { edgeIndex, factor, distance };
     });
+    const fromIndex = face[best.edgeIndex]!;
+    const toIndex = face[(best.edgeIndex + 1) % face.length]!;
+    const worldPosition = new Vector3()
+      .fromArray(object.mesh.positions, fromIndex * 3)
+      .lerp(
+        new Vector3().fromArray(object.mesh.positions, toIndex * 3),
+        best.factor,
+      )
+      .applyMatrix4(renderMesh.matrixWorld);
     return {
       objectId,
       faceId: object.mesh.faceIds[faceIndex]!,
       edgeIndex: best.edgeIndex,
       factor: best.factor,
+      worldPosition: {
+        x: worldPosition.x,
+        y: worldPosition.y,
+        z: worldPosition.z,
+      },
     };
   }
   pickPrioritized(

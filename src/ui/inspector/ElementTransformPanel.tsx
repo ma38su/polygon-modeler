@@ -3,6 +3,7 @@ import type { Editor } from "../../editor/Editor";
 import type { ModelObjectSnapshot } from "../../editor/document/types";
 import type { NormalHandleOperation } from "../../viewport/Viewport";
 import type { TransformOrientation } from "../../viewport/transform/elementSelection";
+import { UvEditor } from "./UvEditor";
 import {
   Combine,
   BetweenHorizontalEnd,
@@ -102,6 +103,7 @@ export function ElementTransformPanel({
   transformOrientation,
   knifeActive,
   onKnifeActiveChange,
+  object,
 }: {
   editor: Editor;
   onError(message: string): void;
@@ -113,6 +115,7 @@ export function ElementTransformPanel({
   transformOrientation: TransformOrientation;
   knifeActive: boolean;
   onKnifeActiveChange(active: boolean): void;
+  object?: ModelObjectSnapshot;
 }) {
   const [move, setMove] = useState<Values>({ x: 0, y: 0, z: 0 });
   const [rotate, setRotate] = useState<Values>({ x: 0, y: 0, z: 0 });
@@ -366,6 +369,27 @@ export function ElementTransformPanel({
         </button>
         <button
           type="button"
+          onClick={() => run(() => editor.dissolveSelectedElements())}
+        >
+          <Ungroup aria-hidden="true" />
+          Dissolve
+        </button>
+        <button
+          type="button"
+          onClick={() => run(() => editor.fillSelectedBoundary())}
+        >
+          <SquareDashed aria-hidden="true" />
+          Fill
+        </button>
+        <button
+          type="button"
+          onClick={() => run(() => editor.bridgeSelectedEdgeLoops())}
+        >
+          <Combine aria-hidden="true" />
+          Bridge
+        </button>
+        <button
+          type="button"
           className={knifeActive ? "active" : undefined}
           aria-pressed={knifeActive}
           onClick={() => onKnifeActiveChange(!knifeActive)}
@@ -408,6 +432,55 @@ export function ElementTransformPanel({
         >
           <Ungroup aria-hidden="true" />
           面を分離
+        </button>
+      </fieldset>
+      <fieldset className="modeling-actions selection-actions">
+        <legend>UV</legend>
+        <UvEditor object={object} />
+        {(["xy", "xz", "yz"] as const).map((plane) => (
+          <button
+            type="button"
+            key={plane}
+            onClick={() => run(() => editor.projectSelectedFacesUv(plane))}
+          >
+            <Layers3 aria-hidden="true" />
+            {plane.toUpperCase()}投影
+          </button>
+        ))}
+        <button
+          type="button"
+          onClick={() =>
+            run(() =>
+              editor.transformSelectedFacesUv({
+                rotation: Math.PI / 2,
+              }),
+            )
+          }
+        >
+          <FlipVertical2 aria-hidden="true" />
+          UV 90°回転
+        </button>
+        <button
+          type="button"
+          onClick={() =>
+            run(() =>
+              editor.transformSelectedFacesUv({ scale: { u: 0.5, v: 0.5 } }),
+            )
+          }
+        >
+          <Minimize2 aria-hidden="true" />
+          UV縮小
+        </button>
+        <button
+          type="button"
+          onClick={() =>
+            run(() =>
+              editor.transformSelectedFacesUv({ scale: { u: 2, v: 2 } }),
+            )
+          }
+        >
+          <Maximize2 aria-hidden="true" />
+          UV拡大
         </button>
       </fieldset>
       {modelingOperation && (

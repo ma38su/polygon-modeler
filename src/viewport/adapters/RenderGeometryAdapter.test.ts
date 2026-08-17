@@ -175,4 +175,22 @@ describe("RenderGeometryAdapter selection overlays", () => {
     expect(colors.getX(0)).not.toBe(before);
     adapter.dispose();
   });
+
+  it("replaces and clears the independent hover overlay", () => {
+    const adapter = new RenderGeometryAdapter();
+    const object = createSnapshot();
+    adapter.sync([object], new Set(), []);
+    adapter.setHover({ objectId, elementId: object.mesh.vertexIds[0]! });
+    const mesh = adapter.getMesh(objectId)!;
+    expect(mesh.getObjectByName("hover-overlay")).toBeDefined();
+    adapter.setHover({ objectId, elementId: object.mesh.faceIds[0]! });
+    expect(mesh.getObjectByName("hover-overlay")).toBeDefined();
+    expect(mesh.getObjectByName("hover-overlay")!.children[0]).toHaveProperty(
+      "isMesh",
+      true,
+    );
+    adapter.setHover(undefined);
+    expect(mesh.getObjectByName("hover-overlay")).toBeUndefined();
+    adapter.dispose();
+  });
 });

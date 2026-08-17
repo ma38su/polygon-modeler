@@ -1,5 +1,6 @@
 import {
   AxesHelper,
+  BufferGeometry,
   Color,
   DataTexture,
   DirectionalLight,
@@ -9,6 +10,8 @@ import {
   HemisphereLight,
   InstancedMesh,
   LineSegments,
+  LineBasicMaterial,
+  Float32BufferAttribute,
   Matrix4,
   Mesh,
   OrthographicCamera,
@@ -49,6 +52,7 @@ import { findScreenSnap } from "./snapping";
 import {
   collectSnapCandidates,
   selectedVertexIndices,
+  objectSelectionFrameWorld,
   selectionFrameWorld,
   type TransformOrientation,
 } from "./transform/elementSelection";
@@ -97,6 +101,13 @@ export type TransformCommitListener = (
   id: ObjectId,
   after: TransformValue,
 ) => void;
+export interface ObjectTransformUpdate {
+  readonly id: ObjectId;
+  readonly transform: TransformValue;
+}
+export type ObjectTransformsCommitListener = (
+  updates: readonly ObjectTransformUpdate[],
+) => void;
 export interface ElementTransformUpdate {
   readonly objectId: ObjectId;
   readonly vertices: readonly {
@@ -123,7 +134,10 @@ export class Viewport {
   readonly #picker = new CpuPicker();
   readonly #regionPicker = new RegionPicker();
   #knifePointListener?: KnifePointListener;
+  #knifePreviewStart?: KnifePoint;
+  #knifePreview?: LineSegments;
   readonly #elementPivot = new Object3D();
+  readonly #objectPivot = new Object3D();
   readonly #normalPivot = new Object3D();
   readonly #hemisphereLight = new HemisphereLight(0xffffff, 0x28303d, 1.2);
   readonly #keyLight = new DirectionalLight(0xffffff, 2.2);
@@ -156,6 +170,7 @@ export class Viewport {
   #transformInteractionBlocked = false;
   #fineTransform = false;
   #transformCommitListener?: TransformCommitListener;
+  #objectTransformsCommitListener?: ObjectTransformsCommitListener;
   #elementTransformCommitListener?: ElementTransformCommitListener;
   #normalHandleListener?: NormalHandleListener;
   #normalOperation?: NormalHandleOperation;
@@ -163,7 +178,9 @@ export class Viewport {
   #normalDirection?: Vector3;
   #normalDragging = false;
   #selectedObjectId?: ObjectId;
+  #selectedObjectIds: ReadonlySet<ObjectId> = new Set();
   #transformBefore?: TransformValue;
+  readonly #objectTransformBefore = new Map<ObjectId, TransformValue>();
   #objects: readonly ModelObjectSnapshot[] = [];
   #selectionModes: ReadonlySet<SelectionMode> = new Set(SELECTION_MODES);
   #selectionItems: readonly SelectionItem[] = [];
@@ -173,6 +190,8 @@ export class Viewport {
   >();
   #pickListener?: (item: SelectionItem | undefined, additive: boolean) => void;
   #pointerStart?: { x: number; y: number };
+  #hoverFrame?: number;
+  #hoverPointer?: { x: number; y: number };
   #animationFrame?: number;
   #disposed = false;
   #environmentTexture?: DataTexture;
@@ -182,12 +201,24 @@ export class Viewport {
     this.element = element;
     this.#statusListener = statusListener;
     this.#scene.background = new Color(0x20252e);
-    this.#scene.add(new GridHelper(20, 20, 0x586476, 0x343b47));
-    this.#scene.add(new AxesHelper(2));
+    const grid = new GridHelper(20, 20, 0x586476, 0x343b47);
+    grid.renderOrder = -1;
+    const gridMaterials = Array.isArray(grid.material)
+      ? grid.material
+      : [grid.material];
+    gridMaterials.forEach((material) => (material.depthWrite = false));
+    const axes = new AxesHelper(2);
+    axes.renderOrder = 1;
+    const axesMaterials = Array.isArray(axes.material)
+      ? axes.material
+      : [axes.material];
+    axesMaterials.forEach((material) => (material.depthWrite = false));
+    this.#scene.add(grid, axes);
     this.#keyLight.position.set(5, 8, 6);
     this.#scene.add(this.#hemisphereLight, this.#keyLight);
     this.#scene.add(this.#geometryAdapter.group);
     this.#scene.add(this.#elementPivot);
+    this.#scene.add(this.#objectPivot);
     this.#scene.add(this.#normalPivot);
     this.setLighting(DEFAULT_LIGHTING_SETTINGS);
     this.#perspectiveCamera.position.set(6, 5, 8);
@@ -287,6 +318,7 @@ export class Viewport {
     this.#selectionModes = selectionModes;
     this.#selectionItems = selectionItems;
     this.#selectedObjectId = selectedIds.values().next().value;
+    this.#selectedObjectIds = selectedIds;
     if (this.#normalDragging) return;
     this.#attachSelectedObject();
   }
@@ -299,6 +331,15 @@ export class Viewport {
   }
   setKnifePointListener(listener?: KnifePointListener): void {
     this.#knifePointListener = listener;
+  }
+  setKnifePreviewStart(point?: KnifePoint): void {
+    this.#knifePreviewStart = point;
+    if (!point && this.#knifePreview) {
+      this.#scene.remove(this.#knifePreview);
+      this.#knifePreview.geometry.dispose();
+      (this.#knifePreview.material as LineBasicMaterial).dispose();
+      this.#knifePreview = undefined;
+    }
   }
 
   pickRegion(
@@ -355,6 +396,11 @@ export class Viewport {
   setTransformCommitListener(listener: TransformCommitListener): void {
     this.#transformCommitListener = listener;
   }
+  setObjectTransformsCommitListener(
+    listener: ObjectTransformsCommitListener,
+  ): void {
+    this.#objectTransformsCommitListener = listener;
+  }
 
   setElementTransformCommitListener(
     listener: ElementTransformCommitListener,
@@ -377,6 +423,7 @@ export class Viewport {
 
   dispose(): void {
     this.#disposed = true;
+    this.setKnifePreviewStart(undefined);
     this.#resizeObserver.disconnect();
     this.#controls?.dispose();
     this.#removePointerListeners();
@@ -386,6 +433,7 @@ export class Viewport {
     if (this.#animationFrame !== undefined) {
       cancelAnimationFrame(this.#animationFrame);
     }
+    if (this.#hoverFrame !== undefined) cancelAnimationFrame(this.#hoverFrame);
     this.#renderer?.setAnimationLoop(null);
     this.#renderer?.domElement.removeEventListener(
       "webglcontextlost",
@@ -485,6 +533,14 @@ export class Viewport {
       "pointerup",
       this.#handlePointerUp,
     );
+    this.#renderer.domElement.addEventListener(
+      "pointermove",
+      this.#handlePointerMove,
+    );
+    this.#renderer.domElement.addEventListener(
+      "pointerleave",
+      this.#handlePointerLeave,
+    );
   }
   #handlePointerDown = (event: PointerEvent): void => {
     this.#pointerStart = { x: event.clientX, y: event.clientY };
@@ -493,6 +549,79 @@ export class Viewport {
     const canvas = this.#renderer?.domElement;
     canvas?.removeEventListener("pointerdown", this.#handlePointerDown);
     canvas?.removeEventListener("pointerup", this.#handlePointerUp);
+    canvas?.removeEventListener("pointermove", this.#handlePointerMove);
+    canvas?.removeEventListener("pointerleave", this.#handlePointerLeave);
+  }
+  #handlePointerMove = (event: PointerEvent): void => {
+    if (this.#transformControls?.dragging || !this.#pickListener) {
+      this.#handlePointerLeave();
+      return;
+    }
+    if (this.#knifePointListener) {
+      const hover = this.#picker.pickKnifePoint(
+        event.clientX,
+        event.clientY,
+        this.element.getBoundingClientRect(),
+        this.#camera,
+        this.#geometryAdapter,
+        this.#objects,
+      );
+      if (hover && this.#knifePreviewStart)
+        this.#updateKnifePreview(this.#knifePreviewStart, hover);
+      return;
+    }
+    this.#hoverPointer = { x: event.clientX, y: event.clientY };
+    if (this.#hoverFrame !== undefined) return;
+    this.#hoverFrame = requestAnimationFrame(() => {
+      this.#hoverFrame = undefined;
+      const point = this.#hoverPointer;
+      if (!point) return;
+      this.#geometryAdapter.setHover(
+        this.#picker.pickPrioritized(
+          point.x,
+          point.y,
+          this.element.getBoundingClientRect(),
+          this.#camera,
+          this.#geometryAdapter,
+          this.#objects,
+          this.#selectionModes,
+        ),
+      );
+    });
+  };
+  #handlePointerLeave = (): void => {
+    this.#hoverPointer = undefined;
+    if (this.#hoverFrame !== undefined) cancelAnimationFrame(this.#hoverFrame);
+    this.#hoverFrame = undefined;
+    this.#geometryAdapter.setHover(undefined);
+  };
+  #updateKnifePreview(start: KnifePoint, end: KnifePoint): void {
+    if (this.#knifePreview) {
+      this.#scene.remove(this.#knifePreview);
+      this.#knifePreview.geometry.dispose();
+      (this.#knifePreview.material as LineBasicMaterial).dispose();
+    }
+    const geometry = new BufferGeometry();
+    geometry.setAttribute(
+      "position",
+      new Float32BufferAttribute(
+        [
+          start.worldPosition.x,
+          start.worldPosition.y,
+          start.worldPosition.z,
+          end.worldPosition.x,
+          end.worldPosition.y,
+          end.worldPosition.z,
+        ],
+        3,
+      ),
+    );
+    this.#knifePreview = new LineSegments(
+      geometry,
+      new LineBasicMaterial({ color: 0xffd166, depthTest: false }),
+    );
+    this.#knifePreview.renderOrder = 9;
+    this.#scene.add(this.#knifePreview);
   }
   #handlePointerUp = (event: PointerEvent): void => {
     const start = this.#pointerStart;
@@ -621,8 +750,27 @@ export class Viewport {
       this.#selectionItems.length === 0 && this.#selectedObjectId
         ? this.#geometryAdapter.getMesh(this.#selectedObjectId)
         : undefined;
-    if (mesh) {
-      this.#transformControls.setSpace("world");
+    if (mesh && this.#selectedObjectIds.size > 1) {
+      const frame = objectSelectionFrameWorld(
+        this.#objects,
+        this.#selectedObjectIds,
+        this.#transformOrientation,
+      );
+      if (!frame) {
+        this.#transformControls.detach();
+        return;
+      }
+      this.#objectPivot.position.copy(frame.position);
+      this.#objectPivot.quaternion.copy(frame.quaternion);
+      this.#objectPivot.scale.set(1, 1, 1);
+      this.#transformControls.setSpace(
+        this.#transformOrientation === "world" ? "world" : "local",
+      );
+      this.#transformControls.attach(this.#objectPivot);
+    } else if (mesh) {
+      this.#transformControls.setSpace(
+        this.#transformOrientation === "world" ? "world" : "local",
+      );
       this.#transformControls.attach(mesh);
     } else if (this.#selectionItems.length > 0) {
       const frame = selectionFrameWorld(
@@ -666,6 +814,16 @@ export class Viewport {
       this.#captureElementPreview();
       return;
     }
+    if (this.#transformControls?.object === this.#objectPivot) {
+      this.#transformBefore = this.#readTransform(this.#objectPivot);
+      this.#objectTransformBefore.clear();
+      for (const id of this.#selectedObjectIds) {
+        const mesh = this.#geometryAdapter.getMesh(id);
+        if (mesh)
+          this.#objectTransformBefore.set(id, this.#readTransform(mesh));
+      }
+      return;
+    }
     const mesh = this.#selectedObjectId
       ? this.#geometryAdapter.getMesh(this.#selectedObjectId)
       : undefined;
@@ -696,6 +854,20 @@ export class Viewport {
       this.#transformBefore = undefined;
       if (updates.length)
         this.#elementTransformCommitListener?.(this.#transformMode, updates);
+      return;
+    }
+    if (
+      this.#transformControls?.object === this.#objectPivot &&
+      this.#transformBefore
+    ) {
+      const updates = [...this.#objectTransformBefore.keys()].flatMap((id) => {
+        const mesh = this.#geometryAdapter.getMesh(id);
+        return mesh ? [{ id, transform: this.#readTransform(mesh) }] : [];
+      });
+      this.#restoreObjectPreview();
+      this.#resetObjectPivot();
+      this.#transformBefore = undefined;
+      if (updates.length) this.#objectTransformsCommitListener?.(updates);
       return;
     }
     const id = this.#selectedObjectId;
@@ -737,8 +909,15 @@ export class Viewport {
       this.#transformControls?.object !== this.#elementPivot ||
       !this.#transformBefore ||
       this.#elementPreview.size === 0
-    )
+    ) {
+      if (
+        this.#transformControls?.object === this.#objectPivot &&
+        this.#transformBefore &&
+        this.#objectTransformBefore.size
+      )
+        this.#previewSelectedObjects();
       return;
+    }
     if (
       this.#transformMode === "translate" &&
       (this.#snapSettings.vertex ||
@@ -768,6 +947,77 @@ export class Viewport {
       this.#updatePreviewOverlays(object, preview, position.array);
     }
   };
+
+  #previewSelectedObjects(): void {
+    const delta = this.#pivotWorldTransform(this.#objectPivot);
+    for (const [id, before] of this.#objectTransformBefore) {
+      const mesh = this.#geometryAdapter.getMesh(id);
+      if (!mesh) continue;
+      const result = delta.clone().multiply(this.#matrixFromTransform(before));
+      result.decompose(mesh.position, mesh.quaternion, mesh.scale);
+      mesh.updateMatrixWorld(true);
+    }
+  }
+
+  #restoreObjectPreview(): void {
+    for (const [id, before] of this.#objectTransformBefore) {
+      const mesh = this.#geometryAdapter.getMesh(id);
+      if (!mesh) continue;
+      mesh.position.set(
+        before.position.x,
+        before.position.y,
+        before.position.z,
+      );
+      mesh.rotation.set(
+        before.rotation.x,
+        before.rotation.y,
+        before.rotation.z,
+      );
+      mesh.scale.set(before.scale.x, before.scale.y, before.scale.z);
+      mesh.updateMatrixWorld(true);
+    }
+    this.#objectTransformBefore.clear();
+  }
+
+  #resetObjectPivot(): void {
+    if (!this.#transformBefore) return;
+    const before = this.#transformBefore;
+    this.#objectPivot.position.set(
+      before.position.x,
+      before.position.y,
+      before.position.z,
+    );
+    this.#objectPivot.rotation.set(
+      before.rotation.x,
+      before.rotation.y,
+      before.rotation.z,
+    );
+    this.#objectPivot.scale.set(1, 1, 1);
+  }
+
+  #pivotWorldTransform(pivot: Object3D): Matrix4 {
+    const initial = this.#matrixFromTransform(this.#transformBefore!);
+    pivot.updateMatrix();
+    return pivot.matrix.clone().multiply(initial.invert());
+  }
+
+  #matrixFromTransform(transform: TransformValue): Matrix4 {
+    return new Matrix4().compose(
+      new Vector3(
+        transform.position.x,
+        transform.position.y,
+        transform.position.z,
+      ),
+      new Quaternion().setFromEuler(
+        new Euler(
+          transform.rotation.x,
+          transform.rotation.y,
+          transform.rotation.z,
+        ),
+      ),
+      new Vector3(transform.scale.x, transform.scale.y, transform.scale.z),
+    );
+  }
 
   #normalHandleDistance(): number {
     if (!this.#normalOrigin || !this.#normalDirection) return 0;
@@ -933,7 +1183,7 @@ export class Viewport {
     }
   }
 
-  #readTransform(mesh: import("three").Mesh): TransformValue {
+  #readTransform(mesh: Object3D): TransformValue {
     return {
       position: { x: mesh.position.x, y: mesh.position.y, z: mesh.position.z },
       rotation: { x: mesh.rotation.x, y: mesh.rotation.y, z: mesh.rotation.z },

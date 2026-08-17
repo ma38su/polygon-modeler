@@ -59,11 +59,10 @@ export class RegionPicker {
       if (modes.has("face"))
         object.mesh.faces.forEach((face, index) => {
           const vertices = face.map(projectVertex);
-          const sum = vertices
-            .reduce(
-              (sum, point) => ({ x: sum.x + point.x, y: sum.y + point.y }),
-              { x: 0, y: 0 },
-            );
+          const sum = vertices.reduce(
+            (sum, point) => ({ x: sum.x + point.x, y: sum.y + point.y }),
+            { x: 0, y: 0 },
+          );
           const center = { x: sum.x / face.length, y: sum.y / face.length };
           if (
             fullyEnclosed
@@ -110,9 +109,12 @@ function contains(
 ): boolean {
   // A point on the lasso stroke counts as enclosed. This makes the result
   // stable when a stroke runs exactly through a projected vertex.
-  if (polygon.some((start, index) =>
-    pointOnSegment(start, polygon[(index + 1) % polygon.length]!, point),
-  )) return true;
+  if (
+    polygon.some((start, index) =>
+      pointOnSegment(start, polygon[(index + 1) % polygon.length]!, point),
+    )
+  )
+    return true;
   let inside = false;
   for (
     let index = 0, previous = polygon.length - 1;

@@ -6,6 +6,7 @@ import {
   type ElementTransformCommitListener,
   type NormalHandleListener,
   type NormalHandleOperation,
+  type ObjectTransformsCommitListener,
   type SnapSettings,
   type TransformCommitListener,
   type TransformMode,
@@ -31,6 +32,7 @@ export interface ViewportCanvasProps {
   selectedObjectIds: ReadonlySet<ObjectId>;
   transformMode?: TransformMode;
   onTransformCommit: TransformCommitListener;
+  onObjectTransformsCommit: ObjectTransformsCommitListener;
   onElementTransformCommit: ElementTransformCommitListener;
   selectionModes: ReadonlySet<SelectionMode>;
   selectionItems: readonly SelectionItem[];
@@ -48,6 +50,7 @@ export interface ViewportCanvasProps {
   lightingSettings?: LightingSettings;
   knifeActive?: boolean;
   onKnifePoint?(point: KnifePoint): void;
+  knifeStart?: KnifePoint;
 }
 
 export function ViewportCanvas({
@@ -57,6 +60,7 @@ export function ViewportCanvas({
   selectedObjectIds,
   transformMode,
   onTransformCommit,
+  onObjectTransformsCommit,
   onElementTransformCommit,
   selectionModes,
   selectionItems,
@@ -74,6 +78,7 @@ export function ViewportCanvas({
   lightingSettings,
   knifeActive,
   onKnifePoint,
+  knifeStart,
 }: ViewportCanvasProps) {
   const hostRef = useRef<HTMLDivElement>(null);
   const viewportRef = useRef<Viewport>(null);
@@ -89,6 +94,7 @@ export function ViewportCanvas({
     });
     viewportRef.current = viewport;
     viewport.setTransformCommitListener(onTransformCommit);
+    viewport.setObjectTransformsCommitListener(onObjectTransformsCommit);
     viewport.setElementTransformCommitListener(onElementTransformCommit);
     viewport.setNormalHandleListener(onNormalHandle);
     void viewport.initialize();
@@ -99,6 +105,7 @@ export function ViewportCanvas({
   }, [
     onElementTransformCommit,
     onNormalHandle,
+    onObjectTransformsCommit,
     onStatusChange,
     onTransformCommit,
   ]);
@@ -151,6 +158,10 @@ export function ViewportCanvas({
       knifeActive ? onKnifePoint : undefined,
     );
   }, [knifeActive, onKnifePoint]);
+  useEffect(
+    () => viewportRef.current?.setKnifePreviewStart(knifeStart),
+    [knifeStart],
+  );
   useEffect(() => {
     if (transformMode) viewportRef.current?.setTransformMode(transformMode);
     else viewportRef.current?.setTransformEnabled(false);

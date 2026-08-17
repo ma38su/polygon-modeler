@@ -1,5 +1,8 @@
-import { Matrix3, Matrix4, Quaternion, Vector3 } from "three";
-import type { ModelObjectSnapshot } from "../../editor/document/types";
+import { Euler, Matrix3, Matrix4, Quaternion, Vector3 } from "three";
+import type {
+  ModelObjectSnapshot,
+  ObjectId,
+} from "../../editor/document/types";
 import type { SelectionItem } from "../../editor/selection/SelectionManager";
 import type { RenderGeometryAdapter } from "../adapters/RenderGeometryAdapter";
 
@@ -14,6 +17,40 @@ export type TransformOrientation = "world" | "local" | "normal";
 export interface SelectionFrame {
   readonly position: Vector3;
   readonly quaternion: Quaternion;
+}
+
+export function objectSelectionFrameWorld(
+  objects: readonly ModelObjectSnapshot[],
+  selectedIds: ReadonlySet<ObjectId>,
+  orientation: TransformOrientation,
+): SelectionFrame | undefined {
+  const selected = objects.filter((object) => selectedIds.has(object.id));
+  if (!selected.length) return undefined;
+  const position = selected
+    .reduce(
+      (sum, object) =>
+        sum.add(
+          new Vector3(
+            object.transform.position.x,
+            object.transform.position.y,
+            object.transform.position.z,
+          ),
+        ),
+      new Vector3(),
+    )
+    .multiplyScalar(1 / selected.length);
+  const quaternion =
+    orientation === "world"
+      ? new Quaternion()
+      : new Quaternion().setFromEuler(
+          new Euler(
+            selected[0]!.transform.rotation.x,
+            selected[0]!.transform.rotation.y,
+            selected[0]!.transform.rotation.z,
+            "XYZ",
+          ),
+        );
+  return { position, quaternion };
 }
 
 export function selectedVertexIndices(

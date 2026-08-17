@@ -16,6 +16,25 @@ export function MaterialInspector({
   const commit = (patch: Partial<MaterialValue>) =>
     editor.setObjectMaterial(object.id, { ...object.material, ...patch });
   const physical = object.material.shading === "standard";
+  const setTexture = (
+    slot: "baseColor" | "normal" | "roughness" | "metalness",
+    file?: File,
+  ) => {
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = () =>
+      commit({
+        textures: {
+          ...object.material.textures,
+          [slot]: {
+            source: String(reader.result),
+            name: file.name,
+            colorSpace: slot === "baseColor" ? "srgb" : "linear",
+          },
+        },
+      });
+    reader.readAsDataURL(file);
+  };
 
   return (
     <div className="material-inspector" aria-label="マテリアル">
@@ -63,6 +82,31 @@ export function MaterialInspector({
           }
         />
       </label>
+      {(
+        [
+          ["baseColor", "Base Color画像"],
+          ["normal", "Normal画像"],
+          ["roughness", "Roughness画像"],
+          ["metalness", "Metalness画像"],
+        ] as const
+      ).map(([slot, label]) => (
+        <label
+          key={slot}
+          className={slot !== "baseColor" && !physical ? "disabled" : undefined}
+        >
+          <span>{label}</span>
+          <input
+            type="file"
+            accept="image/*"
+            disabled={slot !== "baseColor" && !physical}
+            aria-label={label}
+            onChange={(event) => {
+              setTexture(slot, event.currentTarget.files?.[0]);
+              event.currentTarget.value = "";
+            }}
+          />
+        </label>
+      ))}
       <label className={!physical ? "disabled" : undefined}>
         <span>金属度</span>
         <input

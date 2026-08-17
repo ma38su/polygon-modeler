@@ -13,7 +13,9 @@ import {
   MeshLambertMaterial,
   MeshPhongMaterial,
   MeshStandardMaterial,
+  SRGBColorSpace,
   SphereGeometry,
+  TextureLoader,
 } from "three";
 import type {
   ModelObjectSnapshot,
@@ -28,6 +30,7 @@ const OVERLAY_NAME = "selection-overlay";
 const baseColor = new Color(0x6f7d91);
 const vertexColor = new Color(0xd7e2f2);
 const selectedColor = new Color(0x55d98b);
+const hoverColor = new Color(0xffc857);
 const VERTEX_RADIUS = 0.025;
 type SurfaceMaterial =
   | MeshBasicMaterial
@@ -44,6 +47,7 @@ export class RenderGeometryAdapter {
     ObjectId,
     { geometry: string; selection: string; display: string }
   >();
+  #hoverItem?: SelectionItem;
   sync(
     objects: readonly ModelObjectSnapshot[],
     selectedIds: ReadonlySet<ObjectId>,
@@ -55,26 +59,31 @@ export class RenderGeometryAdapter {
     for (const [id, mesh] of this.#meshes)
       if (!liveIds.has(id)) this.#remove(id, mesh);
     for (const object of objects) {
-      const geometryRevision = `${geometryEpoch}:${object.mesh.revision}`;
+      const renderObject = object.evaluatedMesh
+        ? { ...object, mesh: object.evaluatedMesh }
+        : object;
+      const geometryRevision = `${geometryEpoch}:${object.mesh.revision}:${JSON.stringify(object.modifiers ?? [])}`;
       let mesh = this.#meshes.get(object.id);
       if (!mesh) {
-        mesh = this.#createMesh(object);
+        mesh = this.#createMesh(renderObject);
         this.#meshes.set(object.id, mesh);
         this.group.add(mesh);
         this.#meshRevisions.set(object.id, geometryRevision);
         this.#materialRevisions.set(object.id, JSON.stringify(object.material));
       } else if (this.#meshRevisions.get(object.id) !== geometryRevision) {
+        if (this.#hoverItem?.objectId === object.id) this.setHover(undefined);
         mesh.geometry.dispose();
-        mesh.geometry = this.#createGeometry(object);
+        mesh.geometry = this.#createGeometry(renderObject);
         this.#meshRevisions.set(object.id, geometryRevision);
       }
       const materialRevision = JSON.stringify(object.material);
       if (this.#materialRevisions.get(object.id) !== materialRevision) {
-        (mesh.material as SurfaceMaterial).dispose();
+        this.#disposeMaterial(mesh.material as SurfaceMaterial);
         mesh.material = this.#createMaterial(object);
         this.#materialRevisions.set(object.id, materialRevision);
       }
       mesh.name = object.name;
+      mesh.userData.modelSnapshot = object;
       mesh.visible = object.visible;
       mesh.position.set(
         object.transform.position.x,
@@ -101,9 +110,10 @@ export class RenderGeometryAdapter {
       material.opacity = displayLayers.faces ? 1 : 0;
       material.depthWrite = displayLayers.faces;
       material.colorWrite = displayLayers.faces;
+      mesh.userData.modelSnapshot = renderObject;
       this.#syncOverlay(
         mesh,
-        object,
+        renderObject,
         selectionItems,
         displayLayers,
         geometryRevision,
@@ -126,23 +136,96 @@ export class RenderGeometryAdapter {
     return this.#meshes.get(id)?.getObjectByName(OVERLAY_NAME) as
       Group | undefined;
   }
+  setHover(item?: SelectionItem): void {
+    if (
+      item?.objectId === this.#hoverItem?.objectId &&
+      item?.elementId === this.#hoverItem?.elementId
+    )
+      return;
+    if (this.#hoverItem) {
+      const previous = this.#meshes
+        .get(this.#hoverItem.objectId)
+        ?.getObjectByName("hover-overlay");
+      if (previous) {
+        previous.parent?.remove(previous);
+        this.#disposeObject(previous);
+      }
+    }
+    this.#hoverItem = item;
+    if (!item) return;
+    const mesh = this.#meshes.get(item.objectId);
+    if (!mesh) return;
+    // Snapshot data is retained on the render mesh so hover updates remain
+    // independent from React/scene synchronization.
+    const snapshot = mesh.userData.modelSnapshot as
+      ModelObjectSnapshot | undefined;
+    if (!snapshot) return;
+    const overlay = new Group();
+    overlay.name = "hover-overlay";
+    overlay.renderOrder = 7;
+    const vertexIndex = snapshot.mesh.vertexIds.indexOf(
+      item.elementId as (typeof snapshot.mesh.vertexIds)[number],
+    );
+    if (vertexIndex >= 0) {
+      const marker = this.#createVertexMarkers(
+        snapshot,
+        [vertexIndex],
+        VERTEX_RADIUS,
+        hoverColor,
+      );
+      marker.renderOrder = 7;
+      overlay.add(marker);
+    } else {
+      const edge = snapshot.mesh.edges.find(
+        (candidate) => candidate.id === item.elementId,
+      );
+      if (edge) this.#addHoverEdge(overlay, snapshot, edge.vertices);
+      else {
+        const faceIndex = snapshot.mesh.faceIds.indexOf(
+          item.elementId as (typeof snapshot.mesh.faceIds)[number],
+        );
+        if (faceIndex >= 0) this.#addHoverFace(overlay, snapshot, faceIndex);
+      }
+    }
+    if (overlay.children.length) mesh.add(overlay);
+  }
   #createMesh(object: ModelObjectSnapshot): Mesh {
-    return new Mesh(this.#createGeometry(object), this.#createMaterial(object));
+    const mesh = new Mesh(
+      this.#createGeometry(object),
+      this.#createMaterial(object),
+    );
+    mesh.userData.modelSnapshot = object;
+    return mesh;
   }
 
   #createMaterial(object: ModelObjectSnapshot): SurfaceMaterial {
+    const load = (source?: string, srgb = false) => {
+      if (!source) return undefined;
+      const texture = new TextureLoader().load(source);
+      if (srgb) texture.colorSpace = SRGBColorSpace;
+      return texture;
+    };
+    const textures = object.material.textures;
     const common = { color: object.material.color, side: DoubleSide };
+    let material: SurfaceMaterial;
     if (object.material.shading === "basic")
-      return new MeshBasicMaterial(common);
-    if (object.material.shading === "lambert")
-      return new MeshLambertMaterial(common);
-    if (object.material.shading === "phong")
-      return new MeshPhongMaterial({ ...common, shininess: 48 });
-    return new MeshStandardMaterial({
-      ...common,
-      roughness: object.material.roughness,
-      metalness: object.material.metalness,
-    });
+      material = new MeshBasicMaterial(common);
+    else if (object.material.shading === "lambert")
+      material = new MeshLambertMaterial(common);
+    else if (object.material.shading === "phong")
+      material = new MeshPhongMaterial({ ...common, shininess: 48 });
+    else
+      material = new MeshStandardMaterial({
+        ...common,
+        roughness: object.material.roughness,
+        metalness: object.material.metalness,
+      });
+    material.map = load(textures?.baseColor?.source, true) ?? null;
+    if (!(material instanceof MeshStandardMaterial)) return material;
+    material.normalMap = load(textures?.normal?.source) ?? null;
+    material.roughnessMap = load(textures?.roughness?.source) ?? null;
+    material.metalnessMap = load(textures?.metalness?.source) ?? null;
+    return material;
   }
 
   #createGeometry(object: ModelObjectSnapshot): BufferGeometry {
@@ -152,6 +235,19 @@ export class RenderGeometryAdapter {
       new Float32BufferAttribute(object.mesh.positions, 3),
     );
     geometry.setIndex(triangulate(object.mesh));
+    if (object.mesh.faceUvs?.some((face) => face.some(Boolean))) {
+      const uv = new Float32Array(object.mesh.vertexIds.length * 2);
+      object.mesh.faces.forEach((face, faceIndex) =>
+        face.forEach((vertexIndex, corner) => {
+          const value = object.mesh.faceUvs?.[faceIndex]?.[corner];
+          if (value) {
+            uv[vertexIndex * 2] = value.u;
+            uv[vertexIndex * 2 + 1] = value.v;
+          }
+        }),
+      );
+      geometry.setAttribute("uv", new Float32BufferAttribute(uv, 2));
+    }
     geometry.computeVertexNormals();
     return geometry;
   }
@@ -375,6 +471,61 @@ export class RenderGeometryAdapter {
     faces.name = "face-selection-overlay";
     overlay.add(faces);
   }
+  #addHoverEdge(
+    overlay: Group,
+    object: ModelObjectSnapshot,
+    vertices: readonly [number, number],
+  ): void {
+    const geometry = new BufferGeometry();
+    geometry.setAttribute(
+      "position",
+      new Float32BufferAttribute(
+        vertices.flatMap((index) =>
+          object.mesh.positions.slice(index * 3, index * 3 + 3),
+        ),
+        3,
+      ),
+    );
+    const line = new LineSegments(
+      geometry,
+      new LineBasicMaterial({
+        color: hoverColor,
+        depthTest: false,
+        depthWrite: false,
+      }),
+    );
+    line.renderOrder = 7;
+    overlay.add(line);
+  }
+  #addHoverFace(
+    overlay: Group,
+    object: ModelObjectSnapshot,
+    faceIndex: number,
+  ): void {
+    const face = object.mesh.faces[faceIndex];
+    if (!face || face.length < 3) return;
+    const indices: number[] = [];
+    for (let cursor = 1; cursor < face.length - 1; cursor += 1)
+      indices.push(face[0]!, face[cursor]!, face[cursor + 1]!);
+    const geometry = new BufferGeometry();
+    geometry.setAttribute(
+      "position",
+      new Float32BufferAttribute(object.mesh.positions, 3),
+    );
+    geometry.setIndex(indices);
+    const faceMesh = new Mesh(
+      geometry,
+      new MeshBasicMaterial({
+        color: hoverColor,
+        transparent: true,
+        opacity: 0.28,
+        depthTest: false,
+        depthWrite: false,
+      }),
+    );
+    faceMesh.renderOrder = 7;
+    overlay.add(faceMesh);
+  }
   #addNormalOverlay(overlay: Group, object: ModelObjectSnapshot): void {
     const positions: number[] = [];
     const extent = object.mesh.positions.reduce(
@@ -408,10 +559,26 @@ export class RenderGeometryAdapter {
       const materials = Array.isArray(child.material)
         ? child.material
         : [child.material];
-      materials.forEach((material) => material.dispose());
+      materials.forEach((material) => this.#disposeMaterial(material));
     });
   }
+  #disposeMaterial(material: import("three").Material): void {
+    if (
+      material instanceof MeshBasicMaterial ||
+      material instanceof MeshLambertMaterial ||
+      material instanceof MeshPhongMaterial ||
+      material instanceof MeshStandardMaterial
+    )
+      material.map?.dispose();
+    if (material instanceof MeshStandardMaterial) {
+      material.normalMap?.dispose();
+      material.roughnessMap?.dispose();
+      material.metalnessMap?.dispose();
+    }
+    material.dispose();
+  }
   #remove(id: ObjectId, mesh: Mesh): void {
+    if (this.#hoverItem?.objectId === id) this.#hoverItem = undefined;
     this.group.remove(mesh);
     this.#disposeObject(mesh);
     this.#meshes.delete(id);

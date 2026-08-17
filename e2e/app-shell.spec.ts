@@ -473,7 +473,9 @@ test("exports GLB and STL and imports the STL in print units", async ({
   expect(stlPath).not.toBeNull();
 
   await page.getByRole("button", { name: "削除" }).click();
-  await page.getByLabel("GLBまたはSTLを読み込む").setInputFiles(stlPath!);
+  await page
+    .getByLabel("GLB、STLまたはOBJを読み込む")
+    .setInputFiles(stlPath!);
   await expect(
     page.getByRole("button", { name: "STL Mesh", exact: true }),
   ).toBeVisible();

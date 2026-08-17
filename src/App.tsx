@@ -87,6 +87,10 @@ export default function App() {
   const [knifeStart, setKnifeStart] = useState<KnifePoint>();
   const [showShortcuts, setShowShortcuts] = useState(false);
   const [includeHidden, setIncludeHidden] = useState(false);
+  const [importSettings, setImportSettings] = useState<{
+    unit: "meter" | "millimeter";
+    upAxis: "y" | "z";
+  }>({ unit: "meter", upAxis: "y" });
   const [errorMessage, setErrorMessage] = useState<string>();
   const [modelingPreview, setModelingPreview] =
     useState<readonly ModelObjectSnapshot[]>();
@@ -109,6 +113,7 @@ export default function App() {
     snapshot.objects,
     includeHidden,
     setErrorMessage,
+    importSettings,
   );
   useEditorShortcuts(editor, {
     activateTransformMode,
@@ -147,6 +152,11 @@ export default function App() {
       id: Parameters<typeof editor.transformObject>[0],
       after: Parameters<typeof editor.transformObject>[1],
     ) => editor.transformObject(id, after),
+    [editor],
+  );
+  const handleObjectTransformsCommit = useCallback(
+    (updates: Parameters<typeof editor.transformObjects>[0]) =>
+      editor.transformObjects(updates),
     [editor],
   );
   const handleElementTransformCommit = useCallback(
@@ -289,6 +299,10 @@ export default function App() {
             <Upload aria-hidden="true" />
             STL出力
           </button>
+          <button type="button" onClick={exchange.exportObj}>
+            <Upload aria-hidden="true" />
+            OBJ出力
+          </button>
           <button type="button" onClick={openShortcutHelp}>
             表示
             <ChevronDown aria-hidden="true" />
@@ -301,16 +315,54 @@ export default function App() {
             aria-label="プロジェクトファイルを開く"
             onChange={persistence.openFile}
           />
+          <label className="include-hidden">
+            単位
+            <select
+              value={importSettings.unit}
+              onChange={(event) =>
+                setImportSettings((current) => ({
+                  ...current,
+                  unit: event.currentTarget.value as "meter" | "millimeter",
+                }))
+              }
+            >
+              <option value="meter">m</option>
+              <option value="millimeter">mm</option>
+            </select>
+          </label>
+          <label className="include-hidden">
+            Up
+            <select
+              value={importSettings.upAxis}
+              onChange={(event) =>
+                setImportSettings((current) => ({
+                  ...current,
+                  upAxis: event.currentTarget.value as "y" | "z",
+                }))
+              }
+            >
+              <option value="y">Y</option>
+              <option value="z">Z</option>
+            </select>
+          </label>
           <input
             ref={exchange.inputRef}
             className="visually-hidden"
             type="file"
-            accept=".glb,.stl,model/gltf-binary,model/stl"
-            aria-label="GLBまたはSTLを読み込む"
+            accept=".glb,.stl,.obj,model/gltf-binary,model/stl,text/plain"
+            aria-label="GLB、STLまたはOBJを読み込む"
             onChange={exchange.importFile}
           />
         </nav>
         <div className="history-actions" aria-label="履歴操作">
+          {exchange.importProgress !== undefined && (
+            <div className="import-progress" role="status">
+              読込 {Math.round(exchange.importProgress * 100)}%
+              <button type="button" onClick={exchange.cancelImport}>
+                中止
+              </button>
+            </div>
+          )}
           <label className="include-hidden">
             <input
               type="checkbox"
@@ -440,6 +492,7 @@ export default function App() {
             }
             transformMode={transformMode}
             onTransformCommit={handleTransformCommit}
+            onObjectTransformsCommit={handleObjectTransformsCommit}
             onElementTransformCommit={handleElementTransformCommit}
             selectionModes={snapshot.selectionModes}
             selectionItems={
@@ -459,6 +512,7 @@ export default function App() {
             lightingSettings={lightingSettings}
             knifeActive={knifeActive}
             onKnifePoint={handleKnifePoint}
+            knifeStart={knifeStart}
           />
           {normalOperation && (
             <div className="normal-operation-badge" role="status">

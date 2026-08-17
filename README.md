@@ -3,20 +3,22 @@
 [![GitHub Pages deployment](https://github.com/ma38su/polygon-modeler/actions/workflows/deploy-pages.yml/badge.svg)](https://github.com/ma38su/polygon-modeler/actions/workflows/deploy-pages.yml)
 [![Open Polygon Modeler](https://img.shields.io/badge/Open-Polygon_Modeler-4f7cff?logo=github)](https://ma38su.github.io/polygon-modeler/)
 
-ブラウザ内で完結する、ローカルファーストのポリゴンモデラーです。Box、Plane、Cylinderから編集を始め、プロジェクト保存やGLB / STL入出力までブラウザだけで行えます。
+ブラウザ内で完結する、ローカルファーストのポリゴンモデラーです。Box、Plane、Cylinderから編集を始め、モデリング、マテリアル調整、プロジェクト保存、3Dファイル入出力までブラウザだけで行えます。
 
 公開版: [https://ma38su.github.io/polygon-modeler/](https://ma38su.github.io/polygon-modeler/)
 
 ## 主な編集機能
 
 - Vertex / Edge / Faceの独立した選択・表示、移動・回転・拡大縮小
-- Extrude、Inset、Bevel、Loop Cut、ビューポート入力Knife、法線方向移動
+- Extrude、Inset、Bevel、Loop Cut、連続Knife、法線方向移動
 - World／Local／Normal軸Transform、Edge Loop／Ring選択
+- 複数Objectの共通ギズモ、Hoverハイライト、Dissolve／Fill／Bridge
 - メッシュ診断、面法線表示、Merge by Distance、法線再計算
-- Duplicate、Delete、Separate、Join、Mirror
+- Duplicate、Delete、Separate、Join、Mirror／Array／Solidify／Subdivisionモディファイア
 - 閉じた立体同士のBoolean（Union / Subtract / Intersect）
-- PBRマテリアル、環境マップ・ライト調整、WebGPU / WebGL 2描画
-- 差分メッシュ履歴によるUndo / Redo、ローカル自動保存、GLB / STL入出力
+- PBRマテリアル、画像テクスチャ、UV投影・変換、環境マップ・ライト調整
+- 差分メッシュ履歴によるUndo / Redo、ローカル自動保存、GLB / STL / OBJ入出力
+- WebGPU優先、WebGL 2フォールバック描画
 
 ## 開発
 
@@ -35,7 +37,7 @@ npm run build
 npm run test:e2e
 ```
 
-操作方法は[操作ガイド](docs/USER_GUIDE.md)、性能検証と既知の制限は[安定化レポート](docs/STABILITY.md)を参照してください。
+基本操作は画面内のショートカット一覧から確認できます。プロジェクトはブラウザへ自動保存されますが、重要な編集では`.polyproj`も保存してください。
 
 ## コードの境界
 

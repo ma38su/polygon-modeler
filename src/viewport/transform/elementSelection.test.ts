@@ -4,7 +4,10 @@ import { ModelObject } from "../../editor/document/ModelObject";
 import type { ObjectId } from "../../editor/document/types";
 import { createPlaneMesh } from "../../editor/mesh/primitives/plane";
 import { RenderGeometryAdapter } from "../adapters/RenderGeometryAdapter";
-import { selectionFrameWorld } from "./elementSelection";
+import {
+  objectSelectionFrameWorld,
+  selectionFrameWorld,
+} from "./elementSelection";
 
 const objectId = "object-1" as ObjectId;
 
@@ -52,5 +55,34 @@ describe("element selection transform frame", () => {
     expect(normalAxis.y).toBeCloseTo(0);
     expect(normalAxis.z).toBeCloseTo(0);
     adapter.dispose();
+  });
+});
+
+describe("object selection transform frame", () => {
+  it("uses the common origin centroid and the first object's local axes", () => {
+    const first = new ModelObject(objectId, "First", createPlaneMesh());
+    first.transform = {
+      ...first.transform,
+      position: { x: -2, y: 1, z: 0 },
+      rotation: { x: 0, y: 0, z: Math.PI / 2 },
+    };
+    const secondId = "object-2" as ObjectId;
+    const second = new ModelObject(secondId, "Second", createPlaneMesh());
+    second.transform = {
+      ...second.transform,
+      position: { x: 4, y: 3, z: 2 },
+    };
+    const frame = objectSelectionFrameWorld(
+      [first.toSnapshot(), second.toSnapshot()],
+      new Set([objectId, secondId]),
+      "local",
+    )!;
+    expect(frame.position.toArray()).toEqual([1, 2, 1]);
+    expect(
+      new Vector3(1, 0, 0).applyQuaternion(frame.quaternion).x,
+    ).toBeCloseTo(0);
+    expect(
+      new Vector3(1, 0, 0).applyQuaternion(frame.quaternion).y,
+    ).toBeCloseTo(1);
   });
 });

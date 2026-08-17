@@ -28,6 +28,7 @@ import type {
 import type { TransformOrientation } from "../../viewport/transform/elementSelection";
 import type { LightingSettings } from "../../viewport/Viewport";
 import { LightingPanel } from "../inspector/LightingPanel";
+import { ModifierPanel } from "../inspector/ModifierPanel";
 
 interface ScenePanelProps {
   editor: Editor;
@@ -238,6 +239,7 @@ export function ScenePanel({
             transformOrientation={transformOrientation}
             knifeActive={knifeActive}
             onKnifeActiveChange={onKnifeActiveChange}
+            object={selectedObject}
           />
         ) : selectedObject ? (
           <>
@@ -247,6 +249,7 @@ export function ScenePanel({
               orientation={transformOrientation}
             />
             <MaterialInspector editor={editor} object={selectedObject} />
+            <ModifierPanel editor={editor} object={selectedObject} />
             <div className="mesh-diagnostics" aria-label="メッシュ診断">
               <h3>メッシュ診断</h3>
               <dl>
@@ -254,9 +257,11 @@ export function ScenePanel({
                   <dt>状態</dt>
                   <dd>
                     {diagnostics!.healthy
-                      ? diagnostics!.closed
-                        ? "正常・閉じた立体"
-                        : "正常・開いたサーフェス"
+                      ? diagnostics!.inverted
+                        ? "警告・面が内向き"
+                        : diagnostics!.closed
+                          ? "正常・閉じた立体"
+                          : "正常・開いたサーフェス"
                       : "要修復"}
                   </dd>
                 </div>
