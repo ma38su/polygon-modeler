@@ -635,16 +635,19 @@ export class Editor {
     }
   }
   extrudeSelectedFaces(distance: number): void {
-    this.#applyTopology("面を押し出し", (mesh, items) =>
-      extrudeFaces(
-        mesh,
-        new Set(
-          items
-            .map((item) => item.elementId as FaceId)
-            .filter((id) => mesh.faces.has(id)),
+    this.#applyTopology(
+      "面を押し出し",
+      (mesh, items) =>
+        extrudeFaces(
+          mesh,
+          new Set(
+            items
+              .map((item) => item.elementId as FaceId)
+              .filter((id) => mesh.faces.has(id)),
+          ),
+          distance,
         ),
-        distance,
-      ),
+      selectExtrudeResult,
     );
   }
   previewExtrudeSelectedFaces(
@@ -690,21 +693,24 @@ export class Editor {
     );
   }
   bevelSelectedElements(amount: number): void {
-    this.#applyTopology("要素をベベル", (mesh, items) =>
-      bevelElements(
-        mesh,
-        new Set(
-          items
-            .map((item) => item.elementId as VertexId)
-            .filter((id) => mesh.vertices.has(id)),
+    this.#applyTopology(
+      "要素をベベル",
+      (mesh, items) =>
+        bevelElements(
+          mesh,
+          new Set(
+            items
+              .map((item) => item.elementId as VertexId)
+              .filter((id) => mesh.vertices.has(id)),
+          ),
+          new Set(
+            items
+              .map((item) => item.elementId as EdgeId)
+              .filter((id) => mesh.edges.has(id)),
+          ),
+          amount,
         ),
-        new Set(
-          items
-            .map((item) => item.elementId as EdgeId)
-            .filter((id) => mesh.edges.has(id)),
-        ),
-        amount,
-      ),
+      selectCreatedFacesAndEdges,
     );
   }
   previewBevelSelectedElements(amount: number): readonly ModelObjectSnapshot[] {
@@ -758,7 +764,23 @@ export class Editor {
     });
   }
   loopCutSelectedEdges(factor = 0.5): void {
-    this.#applyTopology("ループカット", (mesh, items) =>
+    this.#applyTopology(
+      "ループカット",
+      (mesh, items) =>
+        loopCut(
+          mesh,
+          new Set(
+            items
+              .map((item) => item.elementId as EdgeId)
+              .filter((id) => mesh.edges.has(id)),
+          ),
+          factor,
+        ),
+      selectCreatedEdges,
+    );
+  }
+  previewLoopCutSelectedEdges(factor = 0.5): readonly ModelObjectSnapshot[] {
+    return this.#previewTopology((mesh, items) =>
       loopCut(
         mesh,
         new Set(
@@ -850,8 +872,13 @@ export class Editor {
       mesh: EditableMesh,
       items: readonly SelectionItem[],
     ) => EditableMesh,
+    selectAfter?: (
+      before: EditableMesh,
+      after: EditableMesh,
+    ) => readonly (VertexId | EdgeId | FaceId)[],
   ): void {
     const commands: EditMeshCommand[] = [];
+    const nextSelection: SelectionItem[] = [];
     for (const [objectId, items] of this.#selectionGroups()) {
       const object = this.document.getObject(objectId);
       if (!object) continue;
@@ -859,13 +886,20 @@ export class Editor {
       const validation = validateMesh(after);
       if (!validation.valid) throw new Error(validation.errors.join("\n"));
       commands.push(new EditMeshCommand(label, objectId, object.mesh, after));
+      nextSelection.push(
+        ...(selectAfter?.(object.mesh, after) ?? []).map((elementId) => ({
+          objectId,
+          elementId,
+        })),
+      );
     }
     if (!commands.length) return;
     const command = new CompositeCommand(label, commands);
     const before = this.selection.snapshot();
     this.history.execute(command, this.document);
-    this.selection.clear();
+    this.selection.selectAll(nextSelection);
     this.#selectedObjectIds.clear();
+    nextSelection.forEach((item) => this.#selectedObjectIds.add(item.objectId));
     this.#selectionHistory.set(command, {
       before,
       after: this.selection.snapshot(),
@@ -1096,3 +1130,34 @@ export class Editor {
     };
   }
 }
+
+function selectCreatedEdges(
+  before: EditableMesh,
+  after: EditableMesh,
+): EdgeId[] {
+  const firstCreatedVertex = before.vertices.size;
+  const data = after.toMeshData();
+  return data.edges.flatMap((edge) =>
+    edge.vertices.every((index) => index >= firstCreatedVertex)
+      ? [edge.id]
+      : [],
+  );
+}
+
+function selectCreatedFacesAndEdges(
+  before: EditableMesh,
+  after: EditableMesh,
+): (FaceId | EdgeId)[] {
+  const firstCreatedVertex = before.vertices.size;
+  const data = after.toMeshData();
+  return [
+    ...data.faceIds.flatMap((id, index) =>
+      data.faces[index]!.every((vertex) => vertex >= firstCreatedVertex)
+        ? [id]
+        : [],
+    ),
+    ...selectCreatedEdges(before, after),
+  ];
+}
+
+const selectExtrudeResult = selectCreatedFacesAndEdges;

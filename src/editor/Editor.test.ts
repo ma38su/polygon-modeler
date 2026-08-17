@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import { Editor } from "./Editor";
+import type { FaceId } from "./document/types";
 describe("Editor", () => {
   it("creates, selects, hides, and deletes a box without DOM dependencies", () => {
     const editor = new Editor();
@@ -228,10 +229,44 @@ describe("Editor", () => {
     editor.setSelectionMode("edge");
     const edgeId = editor.getSnapshot().objects[0]!.mesh.edges[0]!.id;
     editor.selectElement({ objectId, elementId: edgeId });
+    expect(editor.previewLoopCutSelectedEdges(0.4)[0]!.mesh.faces).toHaveLength(
+      10,
+    );
+    expect(editor.getSnapshot().objects[0]!.mesh.faces).toHaveLength(6);
     editor.loopCutSelectedEdges();
     expect(editor.getSnapshot().objects[0]!.mesh.faces).toHaveLength(10);
+    expect(editor.getSnapshot().selectionItems).toHaveLength(4);
+    expect(
+      editor
+        .getSnapshot()
+        .selectionItems.every((item) =>
+          editor
+            .getSnapshot()
+            .objects[0]!.mesh.edges.some((edge) => edge.id === item.elementId),
+        ),
+    ).toBe(true);
     editor.undo();
     expect(editor.getSnapshot().objects[0]!.mesh.faces).toHaveLength(6);
+  });
+  it("carries generated selections from extrusion into bevel", () => {
+    const editor = new Editor();
+    const objectId = editor.createPlane();
+    editor.setSelectionMode("face");
+    const faceId = editor.getSnapshot().objects[0]!.mesh.faceIds[0]!;
+    editor.selectElement({ objectId, elementId: faceId });
+    editor.extrudeSelectedFaces(1);
+    const extruded = editor.getSnapshot();
+    expect(extruded.selectionItems).toHaveLength(5);
+    expect(
+      extruded.selectionItems.some((item) =>
+        extruded.objects[0]!.mesh.faceIds.includes(item.elementId as FaceId),
+      ),
+    ).toBe(true);
+    editor.bevelSelectedElements(0.1);
+    expect(editor.getSnapshot().objects[0]!.mesh.faces.length).toBeGreaterThan(
+      extruded.objects[0]!.mesh.faces.length,
+    );
+    expect(editor.getSnapshot().selectionItems.length).toBeGreaterThan(0);
   });
   it("previews and commits a Knife face cut", () => {
     const editor = new Editor();

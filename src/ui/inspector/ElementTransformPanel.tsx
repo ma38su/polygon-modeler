@@ -18,7 +18,8 @@ import {
   Ungroup,
 } from "lucide-react";
 type Values = { x: number; y: number; z: number };
-type ModelingOperation = "extrude" | "inset" | "bevel" | "normalMove" | "knife";
+type ModelingOperation =
+  "extrude" | "inset" | "bevel" | "normalMove" | "knife" | "loopCut";
 type ModelingOperationConfig = {
   title: string;
   description: string;
@@ -77,6 +78,16 @@ const modelingOperations: Record<ModelingOperation, ModelingOperationConfig> = {
     min: 0.01,
     max: 0.99,
   },
+  loopCut: {
+    title: "Loop Cut",
+    description: "選択Edge Ringを横切る新しいEdge Loopを作成します。",
+    label: "カット位置",
+    confirm: "ループカット",
+    defaultValue: 0.5,
+    step: 0.05,
+    min: 0.01,
+    max: 0.99,
+  },
 };
 export function ElementTransformPanel({
   editor,
@@ -115,7 +126,9 @@ export function ElementTransformPanel({
               ? editor.previewBevelSelectedElements(value)
               : operation === "normalMove"
                 ? editor.previewMoveSelectedAlongNormals(value)
-                : editor.previewKnifeSelectedFace(value),
+                : operation === "knife"
+                  ? editor.previewKnifeSelectedFace(value)
+                  : editor.previewLoopCutSelectedEdges(value),
       );
     } catch (error) {
       onPreview(undefined);
@@ -140,7 +153,9 @@ export function ElementTransformPanel({
         editor.bevelSelectedElements(modelingValue);
       else if (modelingOperation === "normalMove")
         editor.moveSelectedAlongNormals(modelingValue);
-      else editor.knifeSelectedFace(modelingValue);
+      else if (modelingOperation === "knife")
+        editor.knifeSelectedFace(modelingValue);
+      else editor.loopCutSelectedEdges(modelingValue);
       closeModelingDialog();
     } catch (error) {
       onError(error instanceof Error ? error.message : String(error));
@@ -294,10 +309,7 @@ export function ElementTransformPanel({
           <Scissors aria-hidden="true" />
           Knife
         </button>
-        <button
-          type="button"
-          onClick={() => run(() => editor.loopCutSelectedEdges())}
-        >
+        <button type="button" onClick={() => openModelingDialog("loopCut")}>
           <BetweenHorizontalEnd aria-hidden="true" />
           ループカット
         </button>

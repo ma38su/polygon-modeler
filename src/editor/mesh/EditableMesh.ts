@@ -124,16 +124,22 @@ export class EditableMesh {
     this.halfEdges.clear();
     this.edges.clear();
     this.faces.clear();
-    const copy = source.clone();
-    for (const [id, value] of copy.vertices) this.vertices.set(id, value);
-    for (const [id, value] of copy.halfEdges) this.halfEdges.set(id, value);
-    for (const [id, value] of copy.edges) this.edges.set(id, value);
-    for (const [id, value] of copy.faces) this.faces.set(id, value);
-    this.#nextVertex = copy.#nextVertex;
-    this.#nextHalfEdge = copy.#nextHalfEdge;
-    this.#nextEdge = copy.#nextEdge;
-    this.#nextFace = copy.#nextFace;
-    this.#revision = copy.#revision + 1;
+    for (const [id, vertex] of source.vertices)
+      this.vertices.set(id, {
+        ...vertex,
+        position: { ...vertex.position },
+      });
+    for (const [id, halfEdge] of source.halfEdges)
+      this.halfEdges.set(id, { ...halfEdge });
+    for (const [id, edge] of source.edges)
+      this.edges.set(id, { ...edge, halfEdges: [...edge.halfEdges] });
+    for (const [id, face] of source.faces)
+      this.faces.set(id, { ...face, vertices: [...face.vertices] });
+    this.#nextVertex = source.#nextVertex;
+    this.#nextHalfEdge = source.#nextHalfEdge;
+    this.#nextEdge = source.#nextEdge;
+    this.#nextFace = source.#nextFace;
+    this.#revision = source.#revision + 1;
   }
   transformVertices(
     ids: ReadonlySet<VertexId>,
