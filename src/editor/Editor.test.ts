@@ -157,6 +157,22 @@ describe("Editor", () => {
     expect(editor.getSnapshot().revision).toBe(before.revision);
     expect(editor.getSnapshot().canUndo).toBe(before.canUndo);
   });
+  it("previews and commits an inset as an undoable command", () => {
+    const editor = new Editor();
+    const objectId = editor.createPlane();
+    editor.setSelectionMode("face");
+    const faceId = editor.getSnapshot().objects[0]!.mesh.faceIds[0]!;
+    editor.selectElement({ objectId, elementId: faceId });
+
+    expect(editor.previewInsetSelectedFaces(0.25)[0]!.mesh.faces).toHaveLength(
+      5,
+    );
+    expect(editor.getSnapshot().objects[0]!.mesh.faces).toHaveLength(1);
+    editor.insetSelectedFaces(0.25);
+    expect(editor.getSnapshot().objects[0]!.mesh.faces).toHaveLength(5);
+    editor.undo();
+    expect(editor.getSnapshot().objects[0]!.mesh.faces).toHaveLength(1);
+  });
   it("converts gizmo movement from world space into object-local space", () => {
     const editor = new Editor();
     const objectId = editor.createBox();

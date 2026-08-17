@@ -571,21 +571,21 @@ kbd {
   width: 100%;
   padding: 0 var(--space-1-5);
 }
-.extrusion-dialog {
+.modeling-value-dialog {
   width: min(360px, calc(100vw - 32px));
 }
-.extrusion-dialog h2 {
+.modeling-value-dialog h2 {
   font-size: var(--font-size-md);
 }
-.extrusion-dialog p {
+.modeling-value-dialog p {
   margin: var(--space-3) 0;
   color: var(--text-secondary);
   font-size: var(--font-size-sm);
 }
-.extrusion-distance-field {
+.modeling-value-field {
   margin-bottom: var(--space-4);
 }
-.extrusion-distance-field > span {
+.modeling-value-field > span {
   flex: 0 0 auto;
 }
 .transform-inspector legend {

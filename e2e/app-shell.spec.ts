@@ -195,6 +195,28 @@ test("cancels, commits, and replays a face extrusion dialog", async ({
   await expect(page.getByText("面: 5")).toBeVisible();
 });
 
+test("previews and commits a face inset dialog", async ({ page }) => {
+  await page.goto("/?renderer=webgl2");
+  await page.getByRole("button", { name: "Plane追加" }).click();
+  const selectionModes = page.getByLabel("選択モード");
+  await selectionModes.getByRole("button", { name: "Vertex" }).click();
+  await selectionModes.getByRole("button", { name: "Edge" }).click();
+  await page.keyboard.press("ControlOrMeta+A");
+
+  await page.getByRole("button", { name: "インセット" }).click();
+  const dialog = page.getByRole("dialog", { name: "面をインセット" });
+  await expect(dialog).toBeVisible();
+  await dialog.getByLabel("インセット率").fill("0.25");
+  await expect(page.getByTestId("viewport-canvas")).toHaveAttribute(
+    "data-modeling-preview",
+    "true",
+  );
+  await dialog.getByRole("button", { name: "インセット" }).click();
+  await expect(page.getByText("面: 5")).toBeVisible();
+  await page.getByRole("button", { name: "元に戻す" }).click();
+  await expect(page.getByText("面: 1")).toBeVisible();
+});
+
 test("selects vertices with box and lasso gestures", async ({ page }) => {
   await page.goto("/?renderer=webgl2");
   await page.getByRole("button", { name: "Box追加" }).click();

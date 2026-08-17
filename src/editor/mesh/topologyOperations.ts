@@ -90,6 +90,58 @@ export function extrudeFaces(
   );
 }
 
+export function insetFaces(
+  mesh: EditableMesh,
+  faceIds: ReadonlySet<FaceId>,
+  amount: number,
+): EditableMesh {
+  if (!Number.isFinite(amount) || amount < 0 || amount >= 1)
+    throw new Error("インセット率は0以上1未満で指定してください。");
+  const data = mesh.toMeshData();
+  const selected = new Set(
+    data.faceIds.flatMap((id, index) => (faceIds.has(id) ? [index] : [])),
+  );
+  if (!selected.size) return mesh.clone();
+  const positions = [...data.positions];
+  const polygons = data.faces
+    .filter((_, index) => !selected.has(index))
+    .map((face) => [...face]);
+  for (const faceIndex of selected) {
+    const face = data.faces[faceIndex]!;
+    const center = face
+      .map((index) => vector(data.positions, index))
+      .reduce(
+        (sum, point) => ({
+          x: sum.x + point.x / face.length,
+          y: sum.y + point.y / face.length,
+          z: sum.z + point.z / face.length,
+        }),
+        { x: 0, y: 0, z: 0 },
+      );
+    const inner = face.map((index) => {
+      const point = vector(data.positions, index);
+      const next = positions.length / 3;
+      positions.push(
+        point.x + (center.x - point.x) * amount,
+        point.y + (center.y - point.y) * amount,
+        point.z + (center.z - point.z) * amount,
+      );
+      return next;
+    });
+    polygons.push(inner);
+    face.forEach((vertex, cursor) => {
+      const next = (cursor + 1) % face.length;
+      polygons.push([vertex, face[next]!, inner[next]!, inner[cursor]!]);
+    });
+  }
+  return EditableMesh.fromPolygons(
+    Array.from({ length: positions.length / 3 }, (_, index) =>
+      vector(positions, index),
+    ),
+    polygons,
+  );
+}
+
 export function splitFace(mesh: EditableMesh, faceId: FaceId): EditableMesh {
   const data = mesh.toMeshData();
   const faceIndex = data.faceIds.indexOf(faceId);

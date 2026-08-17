@@ -4,6 +4,7 @@ import { createPlaneMesh } from "./primitives/plane";
 import {
   extrudeFaces,
   flipFaces,
+  insetFaces,
   mergeVertices,
   splitEdge,
   splitFace,
@@ -32,6 +33,13 @@ describe("topology operations", () => {
     const result = extrudeFaces(mesh, new Set(faces), 0.5);
     expect(validateMesh(result).valid).toBe(true);
     expect(result.faces.size).toBeGreaterThan(mesh.faces.size);
+  });
+  it("insets a face with an inner face and surrounding ring", () => {
+    const mesh = createPlaneMesh();
+    const result = insetFaces(mesh, new Set(mesh.faces.keys()), 0.25);
+    expect(result.vertices.size).toBe(8);
+    expect(result.faces.size).toBe(5);
+    expect(validateMesh(result).valid).toBe(true);
   });
   it("splits a face into triangles", () => {
     const mesh = createPlaneMesh();

@@ -5,10 +5,43 @@ import {
   Combine,
   FlipVertical2,
   Layers3,
+  Shrink,
   Scissors,
   SquareDashed,
 } from "lucide-react";
 type Values = { x: number; y: number; z: number };
+type ModelingOperation = "extrude" | "inset";
+type ModelingOperationConfig = {
+  title: string;
+  description: string;
+  label: string;
+  confirm: string;
+  defaultValue: number;
+  step: number;
+  min?: number;
+  max?: number;
+};
+
+const modelingOperations: Record<ModelingOperation, ModelingOperationConfig> = {
+  extrude: {
+    title: "面を押し出す",
+    description: "選択中の面を法線方向へ押し出します。",
+    label: "押し出し量",
+    confirm: "押し出す",
+    defaultValue: 1,
+    step: 0.1,
+  },
+  inset: {
+    title: "面をインセット",
+    description: "選択中の面の内側に、新しい輪郭を作成します。",
+    label: "インセット率",
+    confirm: "インセット",
+    defaultValue: 0.2,
+    step: 0.05,
+    min: 0,
+    max: 0.95,
+  },
+};
 export function ElementTransformPanel({
   editor,
   onError,
@@ -21,8 +54,9 @@ export function ElementTransformPanel({
   const [move, setMove] = useState<Values>({ x: 0, y: 0, z: 0 });
   const [rotate, setRotate] = useState<Values>({ x: 0, y: 0, z: 0 });
   const [scale, setScale] = useState<Values>({ x: 1, y: 1, z: 1 });
-  const [extrudeDistance, setExtrudeDistance] = useState(1);
-  const [showExtrudeDialog, setShowExtrudeDialog] = useState(false);
+  const [modelingOperation, setModelingOperation] =
+    useState<ModelingOperation>();
+  const [modelingValue, setModelingValue] = useState(1);
   const run = (action: () => void) => {
     try {
       action();
@@ -30,24 +64,36 @@ export function ElementTransformPanel({
       onError(error instanceof Error ? error.message : String(error));
     }
   };
-  const closeExtrudeDialog = () => {
+  const closeModelingDialog = () => {
     onPreview(undefined);
-    setShowExtrudeDialog(false);
-    setExtrudeDistance(1);
+    setModelingOperation(undefined);
   };
-  const previewExtrusion = (distance: number) => {
+  const previewModeling = (operation: ModelingOperation, value: number) => {
     try {
-      onPreview(editor.previewExtrudeSelectedFaces(distance));
+      onPreview(
+        operation === "extrude"
+          ? editor.previewExtrudeSelectedFaces(value)
+          : editor.previewInsetSelectedFaces(value),
+      );
     } catch (error) {
       onPreview(undefined);
       onError(error instanceof Error ? error.message : String(error));
     }
   };
   useEffect(() => () => onPreview(undefined), [onPreview]);
-  const applyExtrusion = () => {
+  const openModelingDialog = (operation: ModelingOperation) => {
+    const value = modelingOperations[operation].defaultValue;
+    setModelingOperation(operation);
+    setModelingValue(value);
+    previewModeling(operation, value);
+  };
+  const applyModeling = () => {
+    if (!modelingOperation) return;
     try {
-      editor.extrudeSelectedFaces(extrudeDistance);
-      closeExtrudeDialog();
+      if (modelingOperation === "extrude")
+        editor.extrudeSelectedFaces(modelingValue);
+      else editor.insetSelectedFaces(modelingValue);
+      closeModelingDialog();
     } catch (error) {
       onError(error instanceof Error ? error.message : String(error));
     }
@@ -107,15 +153,13 @@ export function ElementTransformPanel({
       </fieldset>
       <fieldset className="modeling-actions">
         <legend>モデリング</legend>
-        <button
-          type="button"
-          onClick={() => {
-            setShowExtrudeDialog(true);
-            previewExtrusion(extrudeDistance);
-          }}
-        >
+        <button type="button" onClick={() => openModelingDialog("extrude")}>
           <Layers3 aria-hidden="true" />
           押し出し
+        </button>
+        <button type="button" onClick={() => openModelingDialog("inset")}>
+          <Shrink aria-hidden="true" />
+          インセット
         </button>
         <button
           type="button"
@@ -146,45 +190,50 @@ export function ElementTransformPanel({
           面反転
         </button>
       </fieldset>
-      {showExtrudeDialog && (
+      {modelingOperation && (
         <div className="dialog-backdrop" role="presentation">
           <section
-            className="shortcut-dialog extrusion-dialog"
+            className="shortcut-dialog modeling-value-dialog"
             role="dialog"
             aria-modal="true"
-            aria-labelledby="extrusion-dialog-title"
+            aria-labelledby="modeling-value-dialog-title"
             onKeyDown={(event) => {
-              if (event.key === "Escape") closeExtrudeDialog();
+              if (event.key === "Escape") closeModelingDialog();
             }}
           >
             <header>
-              <h2 id="extrusion-dialog-title">面を押し出す</h2>
+              <h2 id="modeling-value-dialog-title">
+                {modelingOperations[modelingOperation].title}
+              </h2>
             </header>
-            <p>選択中の面を法線方向へ押し出します。</p>
-            <label className="scalar-field extrusion-distance-field">
-              <span>押し出し量</span>
+            <p>{modelingOperations[modelingOperation].description}</p>
+            <label className="scalar-field modeling-value-field">
+              <span>{modelingOperations[modelingOperation].label}</span>
               <input
                 autoFocus
-                aria-label="押し出し量"
+                aria-label={modelingOperations[modelingOperation].label}
                 type="number"
-                step="0.1"
-                value={extrudeDistance}
+                step={modelingOperations[modelingOperation].step}
+                min={modelingOperations[modelingOperation].min}
+                max={modelingOperations[modelingOperation].max}
+                value={modelingValue}
                 onChange={(event) => {
-                  const distance = Number(event.currentTarget.value);
-                  setExtrudeDistance(distance);
-                  if (Number.isFinite(distance)) previewExtrusion(distance);
+                  const value = Number(event.currentTarget.value);
+                  setModelingValue(value);
+                  if (Number.isFinite(value))
+                    previewModeling(modelingOperation, value);
                 }}
                 onKeyDown={(event) => {
-                  if (event.key === "Enter") applyExtrusion();
+                  if (event.key === "Enter") applyModeling();
                 }}
               />
             </label>
             <div className="dialog-actions">
-              <button type="button" onClick={closeExtrudeDialog}>
+              <button type="button" onClick={closeModelingDialog}>
                 キャンセル
               </button>
-              <button type="button" onClick={applyExtrusion}>
-                押し出す
+              <button type="button" onClick={applyModeling}>
+                {modelingOperations[modelingOperation].confirm}
               </button>
             </div>
           </section>

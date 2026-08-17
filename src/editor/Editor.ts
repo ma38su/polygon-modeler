@@ -33,6 +33,7 @@ import type { SelectionSnapshot } from "./selection/SelectionManager";
 import {
   createFace,
   extrudeFaces,
+  insetFaces,
   flipFaces,
   mergeVertices,
   splitEdge,
@@ -374,6 +375,32 @@ export class Editor {
             .filter((id) => mesh.faces.has(id)),
         ),
         distance,
+      ),
+    );
+  }
+  insetSelectedFaces(amount: number): void {
+    this.#applyTopology("面をインセット", (mesh, items) =>
+      insetFaces(
+        mesh,
+        new Set(
+          items
+            .map((item) => item.elementId as FaceId)
+            .filter((id) => mesh.faces.has(id)),
+        ),
+        amount,
+      ),
+    );
+  }
+  previewInsetSelectedFaces(amount: number): readonly ModelObjectSnapshot[] {
+    return this.#previewTopology((mesh, items) =>
+      insetFaces(
+        mesh,
+        new Set(
+          items
+            .map((item) => item.elementId as FaceId)
+            .filter((id) => mesh.faces.has(id)),
+        ),
+        amount,
       ),
     );
   }
