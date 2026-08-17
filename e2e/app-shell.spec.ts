@@ -168,6 +168,42 @@ test("cancels, commits, and replays a face extrusion dialog", async ({
   await expect(page.getByText("面: 5")).toBeVisible();
 });
 
+test("selects vertices with box and lasso gestures", async ({ page }) => {
+  await page.goto("/?renderer=webgl2");
+  await page.getByRole("button", { name: "Box追加" }).click();
+  const modes = page.getByLabel("選択モード");
+  await modes.getByRole("button", { name: "Edge" }).click();
+  await modes.getByRole("button", { name: "Face" }).click();
+  const viewport = page.getByTestId("viewport-canvas");
+  const bounds = await viewport.boundingBox();
+  expect(bounds).not.toBeNull();
+
+  await page.getByRole("button", { name: "矩形選択" }).click();
+  await page.mouse.move(bounds!.x + 100, bounds!.y + 100);
+  await page.mouse.down();
+  await page.mouse.move(
+    bounds!.x + bounds!.width - 100,
+    bounds!.y + bounds!.height - 100,
+  );
+  await page.mouse.up();
+  await expect(page.getByText("選択: 8")).toBeVisible();
+
+  await page.keyboard.press("Alt+A");
+  await page.getByRole("button", { name: "投げ縄選択" }).click();
+  const center = {
+    x: bounds!.x + bounds!.width / 2,
+    y: bounds!.y + bounds!.height / 2,
+  };
+  await page.mouse.move(center.x - 280, center.y - 240);
+  await page.mouse.down();
+  await page.mouse.move(center.x + 280, center.y - 240);
+  await page.mouse.move(center.x + 280, center.y + 240);
+  await page.mouse.move(center.x - 280, center.y + 240);
+  await page.mouse.move(center.x - 280, center.y - 240);
+  await page.mouse.up();
+  await expect(page.getByText("選択: 8")).toBeVisible();
+});
+
 test("coordinates viewport focus, shortcuts, context menu, and dirty state", async ({
   page,
 }) => {

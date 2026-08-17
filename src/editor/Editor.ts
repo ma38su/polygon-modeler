@@ -141,6 +141,14 @@ export class Editor {
       this.#selectedObjectIds.add(selected.objectId);
     this.#commit();
   }
+  selectElements(items: readonly SelectionItem[], additive = false): void {
+    if (additive) this.selection.addAll(items);
+    else this.selection.selectAll(items);
+    this.#selectedObjectIds.clear();
+    for (const selected of this.selection.items)
+      this.#selectedObjectIds.add(selected.objectId);
+    this.#commit();
+  }
   clearSelection(): void {
     this.selection.clear();
     this.#selectedObjectIds.clear();

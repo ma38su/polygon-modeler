@@ -17,6 +17,16 @@ describe("SelectionManager", () => {
     s.clear();
     expect(s.items).toHaveLength(0);
   });
+  it("adds a region selection without removing existing items", () => {
+    const selection = new SelectionManager();
+    selection.selectAll([vertex("v-1")]);
+    selection.addAll([vertex("v-2"), vertex("v-3")]);
+    expect(selection.items).toEqual([
+      vertex("v-1"),
+      vertex("v-2"),
+      vertex("v-3"),
+    ]);
+  });
   it("clears incompatible elements on mode change", () => {
     const s = new SelectionManager();
     s.setMode("vertex");

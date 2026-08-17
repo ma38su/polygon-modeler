@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import {
   AlertCircle,
   Box,
+  BoxSelect,
   ChevronDown,
   CircleGauge,
   Expand,
@@ -9,6 +10,7 @@ import {
   FolderOpen,
   HelpCircle,
   Import,
+  LassoSelect,
   MousePointer2,
   Move3D,
   Plus,
@@ -20,6 +22,7 @@ import {
   Undo2,
 } from "lucide-react";
 import { ViewportCanvas } from "./viewport/ViewportCanvas";
+import type { SelectionGesture } from "./viewport/ViewportCanvas";
 import type { ViewportStatus } from "./viewport/Viewport";
 import type { TransformMode } from "./viewport/Viewport";
 import {
@@ -51,6 +54,8 @@ export default function App() {
   );
   const [transformMode, setTransformMode] =
     useState<TransformMode>("translate");
+  const [selectionGesture, setSelectionGesture] =
+    useState<SelectionGesture>("click");
   const [displayLayers, setDisplayLayers] = useState<DisplayLayers>({
     ...DEFAULT_DISPLAY_LAYERS,
   });
@@ -60,6 +65,10 @@ export default function App() {
   const [contextMenu, setContextMenu] = useState<{ x: number; y: number }>();
   const contextMenuRef = useRef<HTMLDivElement>(null);
   const openShortcutHelp = useCallback(() => setShowShortcuts(true), []);
+  const activateTransformMode = useCallback((mode: TransformMode) => {
+    setSelectionGesture("click");
+    setTransformMode(mode);
+  }, []);
   const persistence = useProjectPersistence(
     editor,
     snapshot.revision,
@@ -73,7 +82,7 @@ export default function App() {
     setErrorMessage,
   );
   useEditorShortcuts(editor, {
-    setTransformMode,
+    activateTransformMode,
     showHelp: openShortcutHelp,
   });
   useEffect(() => {
@@ -112,6 +121,11 @@ export default function App() {
   const handlePick = useCallback(
     (item: Parameters<typeof editor.selectElement>[0], additive: boolean) =>
       editor.selectElement(item, additive),
+    [editor],
+  );
+  const handleRegionPick = useCallback(
+    (items: Parameters<typeof editor.selectElements>[0], additive: boolean) =>
+      editor.selectElements(items, additive),
     [editor],
   );
   const toggleDisplayLayer = useCallback((layer: keyof DisplayLayers) => {
@@ -213,15 +227,33 @@ export default function App() {
         <aside className="tool-panel" aria-label="ツール">
           <h2>ツール</h2>
           {[
-            { label: "選択", icon: MousePointer2, mode: "translate" as const },
+            { label: "選択", icon: MousePointer2, gesture: "click" as const },
+            { label: "矩形選択", icon: BoxSelect, gesture: "box" as const },
+            {
+              label: "投げ縄選択",
+              icon: LassoSelect,
+              gesture: "lasso" as const,
+            },
+          ].map(({ label, icon: Icon, gesture }) => (
+            <button
+              type="button"
+              className={`tool-button${selectionGesture === gesture ? " active" : ""}`}
+              onClick={() => setSelectionGesture(gesture)}
+              key={label}
+            >
+              <Icon aria-hidden="true" />
+              {label}
+            </button>
+          ))}
+          {[
             { label: "移動", icon: Move3D, mode: "translate" as const },
             { label: "回転", icon: Rotate3D, mode: "rotate" as const },
             { label: "拡大縮小", icon: Expand, mode: "scale" as const },
-          ].map(({ label, icon: Icon, mode }, index) => (
+          ].map(({ label, icon: Icon, mode }) => (
             <button
               type="button"
-              className={`tool-button${index > 0 && transformMode === mode ? " active" : ""}`}
-              onClick={() => setTransformMode(mode)}
+              className={`tool-button${selectionGesture === "click" && transformMode === mode ? " active" : ""}`}
+              onClick={() => activateTransformMode(mode)}
               key={label}
             >
               <Icon aria-hidden="true" />
@@ -292,6 +324,8 @@ export default function App() {
             selectionItems={snapshot.selectionItems}
             displayLayers={displayLayers}
             onPick={handlePick}
+            selectionGesture={selectionGesture}
+            onPickRegion={handleRegionPick}
           />
           {contextMenu && (
             <div

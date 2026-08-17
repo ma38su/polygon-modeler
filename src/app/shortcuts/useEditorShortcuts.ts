@@ -4,13 +4,13 @@ import { SELECTION_MODES } from "../../editor/selection/SelectionManager";
 import type { TransformMode } from "../../viewport/Viewport";
 
 interface ShortcutOptions {
-  setTransformMode(mode: TransformMode): void;
+  activateTransformMode(mode: TransformMode): void;
   showHelp(): void;
 }
 
 export function useEditorShortcuts(
   editor: Editor,
-  { setTransformMode, showHelp }: ShortcutOptions,
+  { activateTransformMode, showHelp }: ShortcutOptions,
 ): void {
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
@@ -32,11 +32,11 @@ export function useEditorShortcuts(
         const mode = SELECTION_MODES[Number(event.key) - 1];
         if (mode) editor.toggleSelectionMode(mode);
       } else if (event.key.toLowerCase() === "g") {
-        setTransformMode("translate");
+        activateTransformMode("translate");
       } else if (event.key.toLowerCase() === "r") {
-        setTransformMode("rotate");
+        activateTransformMode("rotate");
       } else if (event.key.toLowerCase() === "s") {
-        setTransformMode("scale");
+        activateTransformMode("scale");
       } else if (event.key === "?") {
         showHelp();
       } else if (event.key === "Delete" || event.key === "Backspace") {
@@ -46,5 +46,5 @@ export function useEditorShortcuts(
     };
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
-  }, [editor, setTransformMode, showHelp]);
+  }, [activateTransformMode, editor, showHelp]);
 }

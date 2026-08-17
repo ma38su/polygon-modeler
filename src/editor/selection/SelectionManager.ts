@@ -49,6 +49,9 @@ export class SelectionManager {
     this.#items.clear();
     for (const item of items) this.#items.set(keyOf(item), item);
   }
+  addAll(items: readonly SelectionItem[]) {
+    for (const item of items) this.#items.set(keyOf(item), item);
+  }
   removeObject(objectId: ObjectId) {
     for (const [key, item] of this.#items)
       if (item.objectId === objectId) this.#items.delete(key);

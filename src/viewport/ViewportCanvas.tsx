@@ -13,6 +13,9 @@ import type {
   SelectionMode,
 } from "../editor/selection/SelectionManager";
 import type { DisplayLayers } from "./displayLayers";
+import type { RegionShape, ScreenPoint } from "./picking/RegionPicker";
+
+export type SelectionGesture = "click" | RegionShape;
 
 export interface ViewportCanvasProps {
   onStatusChange(status: ViewportStatus): void;
@@ -26,6 +29,8 @@ export interface ViewportCanvasProps {
   selectionItems: readonly SelectionItem[];
   displayLayers: DisplayLayers;
   onPick(item: SelectionItem | undefined, additive: boolean): void;
+  selectionGesture: SelectionGesture;
+  onPickRegion(items: readonly SelectionItem[], additive: boolean): void;
 }
 
 export function ViewportCanvas({
@@ -40,10 +45,13 @@ export function ViewportCanvas({
   selectionItems,
   displayLayers,
   onPick,
+  selectionGesture,
+  onPickRegion,
 }: ViewportCanvasProps) {
   const hostRef = useRef<HTMLDivElement>(null);
   const viewportRef = useRef<Viewport>(null);
   const [error, setError] = useState<string>();
+  const [regionPoints, setRegionPoints] = useState<ScreenPoint[]>([]);
 
   useEffect(() => {
     const host = hostRef.current;
@@ -82,6 +90,13 @@ export function ViewportCanvas({
     () => viewportRef.current?.setTransformMode(transformMode),
     [transformMode],
   );
+  useEffect(
+    () =>
+      viewportRef.current?.setRegionSelectionActive(
+        selectionGesture !== "click",
+      ),
+    [selectionGesture],
+  );
 
   return (
     <div
@@ -92,9 +107,68 @@ export function ViewportCanvas({
       data-display-vertices={displayLayers.vertices}
       data-display-edges={displayLayers.edges}
       data-display-faces={displayLayers.faces}
+      data-selection-gesture={selectionGesture}
       tabIndex={0}
       onPointerDown={(event) => event.currentTarget.focus()}
+      onPointerDownCapture={(event) => {
+        if (selectionGesture === "click" || event.button !== 0) return;
+        event.preventDefault();
+        event.stopPropagation();
+        event.currentTarget.setPointerCapture(event.pointerId);
+        const bounds = event.currentTarget.getBoundingClientRect();
+        setRegionPoints([
+          { x: event.clientX - bounds.left, y: event.clientY - bounds.top },
+        ]);
+      }}
+      onPointerMoveCapture={(event) => {
+        if (selectionGesture === "click" || regionPoints.length === 0) return;
+        event.preventDefault();
+        event.stopPropagation();
+        const bounds = event.currentTarget.getBoundingClientRect();
+        const point = {
+          x: event.clientX - bounds.left,
+          y: event.clientY - bounds.top,
+        };
+        setRegionPoints((current) =>
+          selectionGesture === "box"
+            ? [current[0]!, point]
+            : [...current, point],
+        );
+      }}
+      onPointerUpCapture={(event) => {
+        if (selectionGesture === "click" || regionPoints.length === 0) return;
+        event.preventDefault();
+        event.stopPropagation();
+        const bounds = event.currentTarget.getBoundingClientRect();
+        const clientPoints = regionPoints.map((point) => ({
+          x: point.x + bounds.left,
+          y: point.y + bounds.top,
+        }));
+        onPickRegion(
+          viewportRef.current?.pickRegion(clientPoints, selectionGesture) ?? [],
+          event.shiftKey,
+        );
+        setRegionPoints([]);
+      }}
     >
+      {selectionGesture !== "click" && regionPoints.length > 0 && (
+        <svg className="selection-region" aria-hidden="true">
+          {selectionGesture === "box" ? (
+            <rect
+              x={Math.min(regionPoints[0]!.x, regionPoints.at(-1)!.x)}
+              y={Math.min(regionPoints[0]!.y, regionPoints.at(-1)!.y)}
+              width={Math.abs(regionPoints.at(-1)!.x - regionPoints[0]!.x)}
+              height={Math.abs(regionPoints.at(-1)!.y - regionPoints[0]!.y)}
+            />
+          ) : (
+            <polyline
+              points={regionPoints
+                .map((point) => `${point.x},${point.y}`)
+                .join(" ")}
+            />
+          )}
+        </svg>
+      )}
       {error && (
         <div className="viewport-error" role="alert">
           <AlertTriangle aria-hidden="true" />

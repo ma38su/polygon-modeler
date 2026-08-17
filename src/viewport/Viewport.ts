@@ -26,6 +26,11 @@ import type {
 } from "../editor/document/types";
 import { RenderGeometryAdapter } from "./adapters/RenderGeometryAdapter";
 import { CpuPicker } from "./picking/CpuPicker";
+import {
+  RegionPicker,
+  type RegionShape,
+  type ScreenPoint,
+} from "./picking/RegionPicker";
 import type {
   SelectionItem,
   SelectionMode,
@@ -71,6 +76,7 @@ export class Viewport {
   readonly #scene = new Scene();
   readonly #geometryAdapter = new RenderGeometryAdapter();
   readonly #picker = new CpuPicker();
+  readonly #regionPicker = new RegionPicker();
   readonly #elementPivot = new Object3D();
   readonly #perspectiveCamera = new PerspectiveCamera(45, 1, 0.01, 10_000);
   readonly #orthographicCamera = new OrthographicCamera(
@@ -88,6 +94,7 @@ export class Viewport {
   #controls?: OrbitControls;
   #transformControls?: TransformControls;
   #transformMode: TransformMode = "translate";
+  #regionSelectionActive = false;
   #transformCommitListener?: TransformCommitListener;
   #elementTransformCommitListener?: ElementTransformCommitListener;
   #selectedObjectId?: ObjectId;
@@ -194,9 +201,30 @@ export class Viewport {
     this.#pickListener = listener;
   }
 
+  pickRegion(
+    points: readonly ScreenPoint[],
+    shape: RegionShape,
+  ): SelectionItem[] {
+    return this.#regionPicker.pick(
+      points,
+      shape,
+      this.element.getBoundingClientRect(),
+      this.#camera,
+      this.#geometryAdapter,
+      this.#objects,
+      this.#selectionModes,
+    );
+  }
+
   setTransformMode(mode: TransformMode): void {
     this.#transformMode = mode;
     this.#transformControls?.setMode(mode);
+    this.#attachSelectedObject();
+  }
+
+  setRegionSelectionActive(active: boolean): void {
+    if (this.#regionSelectionActive === active) return;
+    this.#regionSelectionActive = active;
     this.#attachSelectedObject();
   }
 
@@ -329,6 +357,10 @@ export class Viewport {
 
   #attachSelectedObject(): void {
     if (!this.#transformControls) return;
+    if (this.#regionSelectionActive) {
+      this.#transformControls.detach();
+      return;
+    }
     const mesh =
       this.#selectionItems.length === 0 && this.#selectedObjectId
         ? this.#geometryAdapter.getMesh(this.#selectedObjectId)
