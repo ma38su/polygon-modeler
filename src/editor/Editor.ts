@@ -48,7 +48,11 @@ import {
 } from "./mesh/topologyOperations";
 import { deserializeProject, serializeProject } from "./formats/projectFormat";
 import type { ImportedMesh } from "./formats/exchangeFormats";
-import { extractFaces, joinObjectMeshes } from "./mesh/objectOperations";
+import {
+  extractFaces,
+  joinObjectMeshes,
+  mirrorMesh,
+} from "./mesh/objectOperations";
 import { moveElementsAlongNormals } from "./mesh/normalMovement";
 type Listener = () => void;
 export class Editor {
@@ -155,6 +159,33 @@ export class Editor {
     this.history.execute(
       new CompositeCommand(
         "オブジェクトを複製",
+        copies.map((copy) => new CreateObjectCommand(copy)),
+      ),
+      this.document,
+    );
+    this.#selectedObjectIds.clear();
+    copies.forEach((copy) => this.#selectedObjectIds.add(copy.id));
+    this.#commit(true);
+  }
+  mirrorSelectedObjects(axis: "x" | "y" | "z"): void {
+    const sources = this.document
+      .objects()
+      .filter((object) => this.#selectedObjectIds.has(object.id));
+    if (!sources.length) return;
+    const copies = sources.map((source) => {
+      const sequence = this.#nextObjectId++;
+      const copy = new ModelObject(
+        `object-${sequence}` as ObjectId,
+        `${source.name} Mirror ${axis.toUpperCase()}`,
+        mirrorMesh(source.mesh, axis),
+      );
+      copy.transform = structuredClone(source.transform);
+      copy.visible = source.visible;
+      return copy;
+    });
+    this.history.execute(
+      new CompositeCommand(
+        `オブジェクトを${axis.toUpperCase()}ミラー`,
         copies.map((copy) => new CreateObjectCommand(copy)),
       ),
       this.document,

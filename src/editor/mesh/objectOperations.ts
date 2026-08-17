@@ -38,6 +38,21 @@ export function joinObjectMeshes(
   return EditableMesh.fromPolygons(positions, faces);
 }
 
+export function mirrorMesh(
+  mesh: EditableMesh,
+  axis: "x" | "y" | "z",
+): EditableMesh {
+  const data = mesh.toMeshData();
+  return EditableMesh.fromPolygons(
+    data.vertexIds.map((_, index) => ({
+      x: data.positions[index * 3]! * (axis === "x" ? -1 : 1),
+      y: data.positions[index * 3 + 1]! * (axis === "y" ? -1 : 1),
+      z: data.positions[index * 3 + 2]! * (axis === "z" ? -1 : 1),
+    })),
+    data.faces.map((face) => [...face].reverse()),
+  );
+}
+
 function compactMesh(
   sourcePositions: readonly number[],
   sourceFaces: readonly (readonly number[])[],

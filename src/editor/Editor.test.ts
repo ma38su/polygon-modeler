@@ -356,6 +356,16 @@ describe("Editor", () => {
     editor.undo();
     expect(editor.getSnapshot().objects).toHaveLength(2);
   });
+  it("creates an undoable mirrored object copy", () => {
+    const editor = new Editor();
+    editor.createPlane();
+    editor.mirrorSelectedObjects("x");
+    expect(editor.getSnapshot().objects).toHaveLength(2);
+    expect(editor.getSnapshot().objects[1]!.name).toContain("Mirror X");
+    expect(editor.getSnapshot().objects[1]!.mesh.positions[0]).toBe(1);
+    editor.undo();
+    expect(editor.getSnapshot().objects).toHaveLength(1);
+  });
   it("separates selected faces into a new object", () => {
     const editor = new Editor();
     const objectId = editor.createBox();

@@ -1,4 +1,4 @@
-import { Box, Combine, Copy, Eye, EyeOff } from "lucide-react";
+import { Box, Combine, Copy, Eye, EyeOff, FlipHorizontal2 } from "lucide-react";
 import type { Editor } from "../../editor/Editor";
 import type { EditorSnapshot } from "../../editor/document/types";
 import { ElementTransformPanel } from "../inspector/ElementTransformPanel";
@@ -84,6 +84,17 @@ export function ScenePanel({
             <Combine aria-hidden="true" />
             結合
           </button>
+          {(["x", "y", "z"] as const).map((axis) => (
+            <button
+              type="button"
+              key={axis}
+              disabled={snapshot.selectedObjectIds.size === 0}
+              onClick={() => editor.mirrorSelectedObjects(axis)}
+            >
+              <FlipHorizontal2 aria-hidden="true" />
+              Mirror {axis.toUpperCase()}
+            </button>
+          ))}
         </div>
       </section>
       <section aria-labelledby="inspector-title">
