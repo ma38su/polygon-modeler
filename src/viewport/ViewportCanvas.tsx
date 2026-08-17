@@ -10,6 +10,8 @@ import {
   type TransformCommitListener,
   type TransformMode,
   type ViewportStatus,
+  type LightingSettings,
+  type KnifePoint,
 } from "./Viewport";
 import type { ModelObjectSnapshot, ObjectId } from "../editor/document/types";
 import type {
@@ -43,6 +45,9 @@ export interface ViewportCanvasProps {
   geometryEpoch: number;
   normalOperation?: NormalHandleOperation;
   onNormalHandle: NormalHandleListener;
+  lightingSettings?: LightingSettings;
+  knifeActive?: boolean;
+  onKnifePoint?(point: KnifePoint): void;
 }
 
 export function ViewportCanvas({
@@ -66,6 +71,9 @@ export function ViewportCanvas({
   geometryEpoch,
   normalOperation,
   onNormalHandle,
+  lightingSettings,
+  knifeActive,
+  onKnifePoint,
 }: ViewportCanvasProps) {
   const hostRef = useRef<HTMLDivElement>(null);
   const viewportRef = useRef<Viewport>(null);
@@ -96,6 +104,9 @@ export function ViewportCanvas({
   ]);
 
   useEffect(() => viewportRef.current?.setProjection(projection), [projection]);
+  useEffect(() => {
+    if (lightingSettings) viewportRef.current?.setLighting(lightingSettings);
+  }, [lightingSettings]);
   useEffect(
     () =>
       viewportRef.current?.syncObjects(
@@ -135,6 +146,11 @@ export function ViewportCanvas({
     () => viewportRef.current?.setPicking(selectionModes, onPick),
     [selectionModes, onPick],
   );
+  useEffect(() => {
+    viewportRef.current?.setKnifePointListener(
+      knifeActive ? onKnifePoint : undefined,
+    );
+  }, [knifeActive, onKnifePoint]);
   useEffect(() => {
     if (transformMode) viewportRef.current?.setTransformMode(transformMode);
     else viewportRef.current?.setTransformEnabled(false);

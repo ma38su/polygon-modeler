@@ -168,14 +168,17 @@ test("shows the empty editor shell", async ({ page }) => {
   await expect(page.getByRole("button", { name: "移動" })).toHaveClass(
     /active/,
   );
-  const positionX = page.getByRole("spinbutton").first();
+  const positionX = page
+    .getByRole("group", { name: "位置" })
+    .getByRole("spinbutton")
+    .first();
   await positionX.fill("2");
   await positionX.blur();
   await expect(positionX).toHaveValue("2");
   await page.getByRole("button", { name: "元に戻す" }).click();
-  await expect(page.getByRole("spinbutton").first()).toHaveValue("0");
+  await expect(positionX).toHaveValue("0");
   await page.getByRole("button", { name: "やり直す" }).click();
-  await expect(page.getByRole("spinbutton").first()).toHaveValue("2");
+  await expect(positionX).toHaveValue("2");
   await page.getByRole("button", { name: "Box 1を非表示" }).click();
   await expect(page.getByRole("button", { name: "Box 1を表示" })).toBeVisible();
   await page.getByRole("button", { name: "削除" }).click();
@@ -273,7 +276,7 @@ test("previews and commits a Knife face cut", async ({ page }) => {
   await selectionModes.getByRole("button", { name: "Vertex" }).click();
   await selectionModes.getByRole("button", { name: "Edge" }).click();
   await page.keyboard.press("ControlOrMeta+A");
-  await page.getByRole("button", { name: "Knife" }).click();
+  await page.getByRole("button", { name: "Knife数値", exact: true }).click();
   const dialog = page.getByRole("dialog", { name: "Knifeで面を切断" });
   await expect(dialog).toBeVisible();
   await dialog.getByLabel("辺上の位置").fill("0.35");

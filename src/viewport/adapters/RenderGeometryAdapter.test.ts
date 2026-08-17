@@ -145,4 +145,34 @@ describe("RenderGeometryAdapter selection overlays", () => {
     expect(normals.geometry.getAttribute("position").count).toBe(12);
     adapter.dispose();
   });
+
+  it("updates edge selection colors without rebuilding unchanged geometry layers", () => {
+    const adapter = new RenderGeometryAdapter();
+    const object = createSnapshot();
+    adapter.sync([object], new Set(), [], {
+      vertices: true,
+      edges: true,
+      faces: true,
+    });
+    const overlay = adapter.getOverlay(objectId)!;
+    const vertices = overlay.getObjectByName("vertex-overlay");
+    const edges = overlay.getObjectByName(
+      "edge-overlay",
+    ) as import("three").LineSegments;
+    const colors = edges.geometry.getAttribute("color");
+    const before = colors.getX(0);
+
+    adapter.sync(
+      [object],
+      new Set(),
+      [{ objectId, elementId: object.mesh.edges[0]!.id }],
+      { vertices: true, edges: true, faces: true },
+    );
+
+    expect(adapter.getOverlay(objectId)).toBe(overlay);
+    expect(overlay.getObjectByName("vertex-overlay")).toBe(vertices);
+    expect(overlay.getObjectByName("edge-overlay")).toBe(edges);
+    expect(colors.getX(0)).not.toBe(before);
+    adapter.dispose();
+  });
 });

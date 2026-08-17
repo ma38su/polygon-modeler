@@ -21,7 +21,12 @@ import {
 } from "lucide-react";
 import { ViewportCanvas } from "./viewport/ViewportCanvas";
 import type { SelectionGesture } from "./viewport/ViewportCanvas";
-import type { ViewportStatus } from "./viewport/Viewport";
+import {
+  DEFAULT_LIGHTING_SETTINGS,
+  type LightingSettings,
+  type KnifePoint,
+  type ViewportStatus,
+} from "./viewport/Viewport";
 import type {
   AxisConstraint,
   NormalHandleOperation,
@@ -75,6 +80,11 @@ export default function App() {
   const [displayLayers, setDisplayLayers] = useState<DisplayLayers>({
     ...DEFAULT_DISPLAY_LAYERS,
   });
+  const [lightingSettings, setLightingSettings] = useState<LightingSettings>({
+    ...DEFAULT_LIGHTING_SETTINGS,
+  });
+  const [knifeActive, setKnifeActive] = useState(false);
+  const [knifeStart, setKnifeStart] = useState<KnifePoint>();
   const [showShortcuts, setShowShortcuts] = useState(false);
   const [includeHidden, setIncludeHidden] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string>();
@@ -163,6 +173,35 @@ export default function App() {
     (items: Parameters<typeof editor.selectElements>[0], additive: boolean) =>
       editor.selectElements(items, additive),
     [editor],
+  );
+  const handleKnifePoint = useCallback(
+    (point: KnifePoint) => {
+      if (!knifeStart) {
+        editor.selectElement(
+          { objectId: point.objectId, elementId: point.faceId },
+          false,
+        );
+        setKnifeStart(point);
+        return;
+      }
+      try {
+        if (
+          knifeStart.objectId !== point.objectId ||
+          knifeStart.faceId !== point.faceId
+        )
+          throw new Error("同じFaceの境界上に2点を指定してください。");
+        editor.knifeFaceAtPoints(
+          point.objectId,
+          point.faceId,
+          knifeStart,
+          point,
+        );
+        setKnifeStart(undefined);
+      } catch (error) {
+        setErrorMessage(error instanceof Error ? error.message : String(error));
+      }
+    },
+    [editor, knifeStart],
   );
   const handleModelingPreview = useCallback(
     (objects?: readonly ModelObjectSnapshot[]) => {
@@ -417,6 +456,9 @@ export default function App() {
             geometryEpoch={geometryEpoch}
             normalOperation={normalOperation}
             onNormalHandle={handleNormalHandle}
+            lightingSettings={lightingSettings}
+            knifeActive={knifeActive}
+            onKnifePoint={handleKnifePoint}
           />
           {normalOperation && (
             <div className="normal-operation-badge" role="status">
@@ -431,6 +473,20 @@ export default function App() {
                 }}
               >
                 キャンセル
+              </button>
+            </div>
+          )}
+          {knifeActive && (
+            <div className="normal-operation-badge" role="status">
+              Knife: {knifeStart ? "終点をクリック" : "始点をクリック"}
+              <button
+                type="button"
+                onClick={() => {
+                  setKnifeActive(false);
+                  setKnifeStart(undefined);
+                }}
+              >
+                終了
               </button>
             </div>
           )}
@@ -502,10 +558,18 @@ export default function App() {
           onError={setErrorMessage}
           onModelingPreview={handleModelingPreview}
           transformMode={transformMode}
+          transformOrientation={transformOrientation}
           onTransformModeChange={(mode) =>
             setTransformMode((current) => (current === mode ? undefined : mode))
           }
           normalOperation={normalOperation}
+          lightingSettings={lightingSettings}
+          onLightingSettingsChange={setLightingSettings}
+          knifeActive={knifeActive}
+          onKnifeActiveChange={(active) => {
+            setKnifeActive(active);
+            setKnifeStart(undefined);
+          }}
           onNormalOperationChange={(operation) => {
             setNormalHandleDistance(0);
             setModelingPreview(undefined);

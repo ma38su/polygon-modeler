@@ -1,7 +1,10 @@
 import {
   AxesHelper,
   Color,
+  DataTexture,
+  DirectionalLight,
   Euler,
+  EquirectangularReflectionMapping,
   GridHelper,
   HemisphereLight,
   InstancedMesh,
@@ -13,6 +16,9 @@ import {
   PerspectiveCamera,
   Quaternion,
   Scene,
+  SRGBColorSpace,
+  RGBAFormat,
+  UnsignedByteType,
   WebGLRenderer,
   type Camera,
   Vector3,
@@ -72,6 +78,21 @@ export interface SnapSettings {
   readonly face: boolean;
   readonly gridSize: number;
 }
+export type EnvironmentPreset = "none" | "studio" | "sunset" | "night";
+export interface LightingSettings {
+  readonly environment: EnvironmentPreset;
+  readonly environmentIntensity: number;
+  readonly hemisphereIntensity: number;
+  readonly keyLightIntensity: number;
+  readonly keyLightColor: string;
+}
+export const DEFAULT_LIGHTING_SETTINGS: LightingSettings = {
+  environment: "studio",
+  environmentIntensity: 0.7,
+  hemisphereIntensity: 1.2,
+  keyLightIntensity: 2.2,
+  keyLightColor: "#ffffff",
+};
 export type TransformCommitListener = (
   id: ObjectId,
   after: TransformValue,
@@ -92,6 +113,8 @@ export type NormalHandleListener = (
   distance: number,
   commit: boolean,
 ) => void;
+export type KnifePoint = NonNullable<ReturnType<CpuPicker["pickKnifePoint"]>>;
+export type KnifePointListener = (point: KnifePoint) => void;
 
 export class Viewport {
   readonly element: HTMLElement;
@@ -99,8 +122,11 @@ export class Viewport {
   readonly #geometryAdapter = new RenderGeometryAdapter();
   readonly #picker = new CpuPicker();
   readonly #regionPicker = new RegionPicker();
+  #knifePointListener?: KnifePointListener;
   readonly #elementPivot = new Object3D();
   readonly #normalPivot = new Object3D();
+  readonly #hemisphereLight = new HemisphereLight(0xffffff, 0x28303d, 1.2);
+  readonly #keyLight = new DirectionalLight(0xffffff, 2.2);
   readonly #perspectiveCamera = new PerspectiveCamera(45, 1, 0.01, 10_000);
   readonly #orthographicCamera = new OrthographicCamera(
     -5,
@@ -149,6 +175,8 @@ export class Viewport {
   #pointerStart?: { x: number; y: number };
   #animationFrame?: number;
   #disposed = false;
+  #environmentTexture?: DataTexture;
+  #environmentPreset?: EnvironmentPreset;
 
   constructor(element: HTMLElement, statusListener: StatusListener) {
     this.element = element;
@@ -156,10 +184,12 @@ export class Viewport {
     this.#scene.background = new Color(0x20252e);
     this.#scene.add(new GridHelper(20, 20, 0x586476, 0x343b47));
     this.#scene.add(new AxesHelper(2));
-    this.#scene.add(new HemisphereLight(0xffffff, 0x28303d, 1.5));
+    this.#keyLight.position.set(5, 8, 6);
+    this.#scene.add(this.#hemisphereLight, this.#keyLight);
     this.#scene.add(this.#geometryAdapter.group);
     this.#scene.add(this.#elementPivot);
     this.#scene.add(this.#normalPivot);
+    this.setLighting(DEFAULT_LIGHTING_SETTINGS);
     this.#perspectiveCamera.position.set(6, 5, 8);
     this.#orthographicCamera.position.copy(this.#perspectiveCamera.position);
 
@@ -216,6 +246,22 @@ export class Viewport {
     this.#emitStatus();
   }
 
+  setLighting(settings: LightingSettings): void {
+    this.#hemisphereLight.intensity = Math.max(0, settings.hemisphereIntensity);
+    this.#keyLight.intensity = Math.max(0, settings.keyLightIntensity);
+    this.#keyLight.color.set(settings.keyLightColor);
+    if (this.#environmentPreset !== settings.environment) {
+      this.#environmentTexture?.dispose();
+      this.#environmentTexture = this.#createEnvironment(settings.environment);
+      this.#environmentPreset = settings.environment;
+      this.#scene.environment = this.#environmentTexture ?? null;
+    }
+    this.#scene.environmentIntensity = Math.max(
+      0,
+      settings.environmentIntensity,
+    );
+  }
+
   syncObjects(
     objects: readonly ModelObjectSnapshot[],
     selectedIds: ReadonlySet<ObjectId>,
@@ -244,6 +290,9 @@ export class Viewport {
   ): void {
     this.#selectionModes = modes;
     this.#pickListener = listener;
+  }
+  setKnifePointListener(listener?: KnifePointListener): void {
+    this.#knifePointListener = listener;
   }
 
   pickRegion(
@@ -334,6 +383,7 @@ export class Viewport {
     this.#renderer?.setAnimationLoop(null);
     this.#renderer?.dispose();
     this.#geometryAdapter.dispose();
+    this.#environmentTexture?.dispose();
     this.element.replaceChildren();
   }
 
@@ -341,6 +391,46 @@ export class Viewport {
     return this.#projection === "perspective"
       ? this.#perspectiveCamera
       : this.#orthographicCamera;
+  }
+
+  #createEnvironment(preset: EnvironmentPreset): DataTexture | undefined {
+    if (preset === "none") return undefined;
+    const palettes: Record<Exclude<EnvironmentPreset, "none">, string[]> = {
+      studio: ["#dce8ff", "#93a6c4", "#323a49", "#171b22"],
+      sunset: ["#5e79ae", "#f2a56b", "#5d3545", "#17131d"],
+      night: ["#15274b", "#26355d", "#11182b", "#070a12"],
+    };
+    const colors = palettes[preset].map((value) => new Color(value));
+    const width = 16;
+    const height = 8;
+    const data = new Uint8Array(width * height * 4);
+    for (let y = 0; y < height; y += 1) {
+      const t = y / (height - 1);
+      const scaled = t * (colors.length - 1);
+      const index = Math.min(colors.length - 2, Math.floor(scaled));
+      const color = colors[index]!.clone().lerp(
+        colors[index + 1]!,
+        scaled - index,
+      );
+      for (let x = 0; x < width; x += 1) {
+        const offset = (y * width + x) * 4;
+        data[offset] = Math.round(color.r * 255);
+        data[offset + 1] = Math.round(color.g * 255);
+        data[offset + 2] = Math.round(color.b * 255);
+        data[offset + 3] = 255;
+      }
+    }
+    const texture = new DataTexture(
+      data,
+      width,
+      height,
+      RGBAFormat,
+      UnsignedByteType,
+    );
+    texture.mapping = EquirectangularReflectionMapping;
+    texture.colorSpace = SRGBColorSpace;
+    texture.needsUpdate = true;
+    return texture;
   }
 
   async #initializeWebGpu(): Promise<void> {
@@ -399,9 +489,21 @@ export class Viewport {
     if (
       !start ||
       Math.hypot(event.clientX - start.x, event.clientY - start.y) > 4 ||
-      !this.#pickListener
+      (!this.#pickListener && !this.#knifePointListener)
     )
       return;
+    if (this.#knifePointListener) {
+      const point = this.#picker.pickKnifePoint(
+        event.clientX,
+        event.clientY,
+        this.element.getBoundingClientRect(),
+        this.#camera,
+        this.#geometryAdapter,
+        this.#objects,
+      );
+      if (point) this.#knifePointListener(point);
+      return;
+    }
     const item = this.#picker.pickPrioritized(
       event.clientX,
       event.clientY,
@@ -411,7 +513,7 @@ export class Viewport {
       this.#objects,
       this.#selectionModes,
     );
-    this.#pickListener(item, event.shiftKey);
+    this.#pickListener?.(item, event.shiftKey);
   };
 
   #initializeTransformControls(): void {

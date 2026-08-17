@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import {
   Blend,
   Box,
@@ -25,6 +25,9 @@ import type {
   NormalHandleOperation,
   TransformMode,
 } from "../../viewport/Viewport";
+import type { TransformOrientation } from "../../viewport/transform/elementSelection";
+import type { LightingSettings } from "../../viewport/Viewport";
+import { LightingPanel } from "../inspector/LightingPanel";
 
 interface ScenePanelProps {
   editor: Editor;
@@ -32,9 +35,14 @@ interface ScenePanelProps {
   onError(message: string): void;
   onModelingPreview(objects?: EditorSnapshot["objects"]): void;
   transformMode?: TransformMode;
+  transformOrientation: TransformOrientation;
   onTransformModeChange(mode: TransformMode): void;
   normalOperation?: NormalHandleOperation;
   onNormalOperationChange(operation: NormalHandleOperation): void;
+  lightingSettings: LightingSettings;
+  onLightingSettingsChange(value: LightingSettings): void;
+  knifeActive: boolean;
+  onKnifeActiveChange(active: boolean): void;
 }
 
 export function ScenePanel({
@@ -43,18 +51,26 @@ export function ScenePanel({
   onError,
   onModelingPreview,
   transformMode,
+  transformOrientation,
   onTransformModeChange,
   normalOperation,
   onNormalOperationChange,
+  lightingSettings,
+  onLightingSettingsChange,
+  knifeActive,
+  onKnifeActiveChange,
 }: ScenePanelProps) {
   const [booleanPending, setBooleanPending] = useState(false);
   const [mergeDistance, setMergeDistance] = useState(0.0001);
   const selectedObject = snapshot.objects.find((object) =>
     snapshot.selectedObjectIds.has(object.id),
   );
-  const diagnostics = selectedObject
-    ? diagnoseMesh(selectedObject.mesh)
-    : undefined;
+  const diagnostics = useMemo(
+    () => (selectedObject ? diagnoseMesh(selectedObject.mesh) : undefined),
+    // Snapshots may be recreated for selection/UI changes while mesh data is unchanged.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [selectedObject?.id, selectedObject?.mesh.revision],
+  );
   const selectedElementKinds = snapshot.selectionItems.reduce((kinds, item) => {
     const object = snapshot.objects.find(
       (candidate) => candidate.id === item.objectId,
@@ -178,6 +194,10 @@ export function ScenePanel({
       </section>
       <section aria-labelledby="inspector-title">
         <h2 id="inspector-title">インスペクター</h2>
+        <LightingPanel
+          value={lightingSettings}
+          onChange={onLightingSettingsChange}
+        />
         {(selectedObject || snapshot.selectionItems.length > 0) && (
           <div className="transform-tools" aria-label="変形ツール">
             {(
@@ -212,6 +232,9 @@ export function ScenePanel({
               selectedElementKinds.has("face") ||
               selectedElementKinds.has("edge")
             }
+            transformOrientation={transformOrientation}
+            knifeActive={knifeActive}
+            onKnifeActiveChange={onKnifeActiveChange}
           />
         ) : selectedObject ? (
           <>
@@ -222,7 +245,13 @@ export function ScenePanel({
               <dl>
                 <div>
                   <dt>状態</dt>
-                  <dd>{diagnostics!.healthy ? "正常" : "要修復"}</dd>
+                  <dd>
+                    {diagnostics!.healthy
+                      ? diagnostics!.closed
+                        ? "正常・閉じた立体"
+                        : "正常・開いたサーフェス"
+                      : "要修復"}
+                  </dd>
                 </div>
                 <div>
                   <dt>境界Edge</dt>

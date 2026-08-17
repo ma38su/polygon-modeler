@@ -655,6 +655,42 @@ kbd {
   padding: 0;
   border: 0;
 }
+.inspector-section {
+  margin: 0 0 var(--space-3);
+  padding: var(--space-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  font-size: var(--font-size-xs);
+}
+.inspector-section legend {
+  padding: 0 var(--space-1);
+  color: var(--text-secondary);
+}
+.inspector-field {
+  display: grid;
+  grid-template-columns: minmax(64px, 1fr) minmax(54px, 1.4fr) 58px;
+  align-items: center;
+  gap: var(--space-1);
+  margin-bottom: var(--space-1-5);
+}
+.inspector-field select {
+  grid-column: 2 / 4;
+}
+.inspector-field input,
+.inspector-field select,
+.lighting-panel button {
+  min-width: 0;
+  min-height: var(--control-sm);
+  font-size: var(--font-size-xs);
+}
+.inspector-field input[type="color"] {
+  grid-column: 2 / 4;
+  width: 100%;
+  padding: 2px;
+}
+.lighting-panel button {
+  width: 100%;
+}
 .transform-tools {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));

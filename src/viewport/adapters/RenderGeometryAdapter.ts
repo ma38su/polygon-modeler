@@ -40,6 +40,10 @@ export class RenderGeometryAdapter {
   readonly #meshes = new Map<ObjectId, Mesh>();
   readonly #meshRevisions = new Map<ObjectId, string>();
   readonly #materialRevisions = new Map<ObjectId, string>();
+  readonly #overlayRevisions = new Map<
+    ObjectId,
+    { geometry: string; selection: string; display: string }
+  >();
   sync(
     objects: readonly ModelObjectSnapshot[],
     selectedIds: ReadonlySet<ObjectId>,
@@ -97,7 +101,13 @@ export class RenderGeometryAdapter {
       material.opacity = displayLayers.faces ? 1 : 0;
       material.depthWrite = displayLayers.faces;
       material.colorWrite = displayLayers.faces;
-      this.#syncOverlay(mesh, object, selectionItems, displayLayers);
+      this.#syncOverlay(
+        mesh,
+        object,
+        selectionItems,
+        displayLayers,
+        geometryRevision,
+      );
     }
   }
   dispose(): void {
@@ -150,28 +160,74 @@ export class RenderGeometryAdapter {
     object: ModelObjectSnapshot,
     items: readonly SelectionItem[],
     displayLayers: DisplayLayers,
+    geometryRevision: string,
   ): void {
-    const previous = mesh.getObjectByName(OVERLAY_NAME);
-    if (previous) {
-      mesh.remove(previous);
-      this.#disposeObject(previous);
-    }
     const selected = new Set(
       items
         .filter((item) => item.objectId === object.id)
         .map((item) => item.elementId),
     );
-    const overlay = new Group();
-    overlay.name = OVERLAY_NAME;
-    overlay.renderOrder = 4;
-    if (displayLayers.vertices)
-      this.#addVertexOverlay(overlay, object, selected, true);
-    if (displayLayers.edges)
-      this.#addEdgeOverlay(overlay, object, selected, true);
-    if (displayLayers.faces) this.#addFaceOverlay(overlay, object, selected);
-    if (displayLayers.normals) this.#addNormalOverlay(overlay, object);
-    if (overlay.children.length === 0) return;
-    mesh.add(overlay);
+    const selectionRevision = [...selected].sort().join("\u0000");
+    const displayRevision = `${displayLayers.vertices ? 1 : 0}${displayLayers.edges ? 1 : 0}${displayLayers.faces ? 1 : 0}${displayLayers.normals ? 1 : 0}`;
+    const previousRevision = this.#overlayRevisions.get(object.id);
+    if (
+      previousRevision?.geometry === geometryRevision &&
+      previousRevision.selection === selectionRevision &&
+      previousRevision.display === displayRevision
+    )
+      return;
+
+    let overlay = mesh.getObjectByName(OVERLAY_NAME) as Group | undefined;
+    if (!overlay) {
+      overlay = new Group();
+      overlay.name = OVERLAY_NAME;
+      overlay.renderOrder = 4;
+      mesh.add(overlay);
+    }
+    const geometryChanged = previousRevision?.geometry !== geometryRevision;
+    const selectionChanged = previousRevision?.selection !== selectionRevision;
+    const displayChanged = previousRevision?.display !== displayRevision;
+    if (geometryChanged || displayChanged) {
+      this.#syncLayer(overlay, "vertex-overlay", displayLayers.vertices, () =>
+        this.#addVertexOverlay(overlay!, object, selected, false),
+      );
+      this.#syncLayer(overlay, "edge-overlay", displayLayers.edges, () =>
+        this.#addEdgeOverlay(overlay!, object, selected, true),
+      );
+      this.#syncLayer(overlay, "normal-overlay", !!displayLayers.normals, () =>
+        this.#addNormalOverlay(overlay!, object),
+      );
+    } else if (selectionChanged && displayLayers.edges) {
+      this.#updateEdgeSelection(overlay, object, selected);
+    }
+    if (geometryChanged || selectionChanged || displayChanged) {
+      this.#removeLayer(overlay, "vertex-selection-overlay");
+      if (displayLayers.vertices)
+        this.#addSelectedVertexOverlay(overlay, object, selected);
+      this.#removeLayer(overlay, "face-selection-overlay");
+      if (displayLayers.faces) this.#addFaceOverlay(overlay, object, selected);
+    }
+    if (overlay.children.length === 0) mesh.remove(overlay);
+    this.#overlayRevisions.set(object.id, {
+      geometry: geometryRevision,
+      selection: selectionRevision,
+      display: displayRevision,
+    });
+  }
+  #syncLayer(
+    overlay: Group,
+    name: string,
+    visible: boolean,
+    create: () => void,
+  ): void {
+    this.#removeLayer(overlay, name);
+    if (visible) create();
+  }
+  #removeLayer(overlay: Group, name: string): void {
+    const layer = overlay.getObjectByName(name);
+    if (!layer) return;
+    overlay.remove(layer);
+    this.#disposeObject(layer);
   }
   #addVertexOverlay(
     overlay: Group,
@@ -187,7 +243,15 @@ export class RenderGeometryAdapter {
     );
     vertices.name = "vertex-overlay";
     overlay.add(vertices);
-    if (!highlightSelection || selected.size === 0) return;
+    if (highlightSelection)
+      this.#addSelectedVertexOverlay(overlay, object, selected);
+  }
+  #addSelectedVertexOverlay(
+    overlay: Group,
+    object: ModelObjectSnapshot,
+    selected: ReadonlySet<SelectionItem["elementId"]>,
+  ): void {
+    if (selected.size === 0) return;
     const selectedIndices = object.mesh.vertexIds.flatMap((id, index) =>
       selected.has(id) ? [index] : [],
     );
@@ -262,6 +326,21 @@ export class RenderGeometryAdapter {
     );
     lines.name = "edge-overlay";
     overlay.add(lines);
+  }
+  #updateEdgeSelection(
+    overlay: Group,
+    object: ModelObjectSnapshot,
+    selected: ReadonlySet<SelectionItem["elementId"]>,
+  ): void {
+    const lines = overlay.getObjectByName("edge-overlay");
+    if (!(lines instanceof LineSegments)) return;
+    const colors = lines.geometry.getAttribute("color");
+    object.mesh.edges.forEach((edge, edgeIndex) => {
+      const color = selected.has(edge.id) ? selectedColor : baseColor;
+      colors.setXYZ(edgeIndex * 2, color.r, color.g, color.b);
+      colors.setXYZ(edgeIndex * 2 + 1, color.r, color.g, color.b);
+    });
+    colors.needsUpdate = true;
   }
   #addFaceOverlay(
     overlay: Group,
@@ -338,5 +417,6 @@ export class RenderGeometryAdapter {
     this.#meshes.delete(id);
     this.#meshRevisions.delete(id);
     this.#materialRevisions.delete(id);
+    this.#overlayRevisions.delete(id);
   }
 }

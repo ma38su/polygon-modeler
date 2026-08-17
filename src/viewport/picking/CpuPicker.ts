@@ -1,5 +1,9 @@
 import { Raycaster, Vector2, Vector3, type Camera, type Mesh } from "three";
-import type { ModelObjectSnapshot } from "../../editor/document/types";
+import type {
+  FaceId,
+  ModelObjectSnapshot,
+  ObjectId,
+} from "../../editor/document/types";
 import type {
   SelectionItem,
   SelectionMode,
@@ -10,6 +14,71 @@ import type { RenderGeometryAdapter } from "../adapters/RenderGeometryAdapter";
 export class CpuPicker {
   readonly #raycaster = new Raycaster();
   static readonly vertexRadiusPx = 4;
+  pickKnifePoint(
+    x: number,
+    y: number,
+    bounds: DOMRect,
+    camera: Camera,
+    adapter: RenderGeometryAdapter,
+    objects: readonly ModelObjectSnapshot[],
+  ):
+    | { objectId: ObjectId; faceId: FaceId; edgeIndex: number; factor: number }
+    | undefined {
+    const pointer = new Vector2(
+      ((x - bounds.left) / bounds.width) * 2 - 1,
+      -((y - bounds.top) / bounds.height) * 2 + 1,
+    );
+    this.#raycaster.setFromCamera(pointer, camera);
+    const hit = this.#raycaster.intersectObjects(
+      adapter.group.children,
+      false,
+    )[0];
+    if (!hit) return undefined;
+    const renderMesh = hit.object as Mesh;
+    const objectId = adapter.getObjectId(renderMesh);
+    const object = objects.find((candidate) => candidate.id === objectId);
+    if (!objectId || !object) return undefined;
+    const triangle = hit.faceIndex ?? 0;
+    let cursor = 0;
+    let faceIndex = -1;
+    for (let index = 0; index < object.mesh.faces.length; index += 1) {
+      const count = Math.max(0, object.mesh.faces[index]!.length - 2);
+      if (triangle < cursor + count) {
+        faceIndex = index;
+        break;
+      }
+      cursor += count;
+    }
+    if (faceIndex < 0) return undefined;
+    const localHit = renderMesh.worldToLocal(hit.point.clone());
+    const face = object.mesh.faces[faceIndex]!;
+    let best = { edgeIndex: 0, factor: 0.5, distance: Infinity };
+    face.forEach((fromIndex, edgeIndex) => {
+      const toIndex = face[(edgeIndex + 1) % face.length]!;
+      const from = new Vector3().fromArray(
+        object.mesh.positions,
+        fromIndex * 3,
+      );
+      const to = new Vector3().fromArray(object.mesh.positions, toIndex * 3);
+      const delta = to.clone().sub(from);
+      const factor = Math.max(
+        0.001,
+        Math.min(
+          0.999,
+          localHit.clone().sub(from).dot(delta) /
+            Math.max(delta.lengthSq(), Number.EPSILON),
+        ),
+      );
+      const distance = localHit.distanceTo(from.addScaledVector(delta, factor));
+      if (distance < best.distance) best = { edgeIndex, factor, distance };
+    });
+    return {
+      objectId,
+      faceId: object.mesh.faceIds[faceIndex]!,
+      edgeIndex: best.edgeIndex,
+      factor: best.factor,
+    };
+  }
   pickPrioritized(
     x: number,
     y: number,

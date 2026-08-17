@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import type { Editor } from "../../editor/Editor";
 import type { ModelObjectSnapshot } from "../../editor/document/types";
 import type { NormalHandleOperation } from "../../viewport/Viewport";
+import type { TransformOrientation } from "../../viewport/transform/elementSelection";
 import {
   Combine,
   BetweenHorizontalEnd,
@@ -98,6 +99,9 @@ export function ElementTransformPanel({
   onNormalOperationChange,
   canExtrude,
   canNormalMove,
+  transformOrientation,
+  knifeActive,
+  onKnifeActiveChange,
 }: {
   editor: Editor;
   onError(message: string): void;
@@ -106,6 +110,9 @@ export function ElementTransformPanel({
   onNormalOperationChange(operation: NormalHandleOperation): void;
   canExtrude: boolean;
   canNormalMove: boolean;
+  transformOrientation: TransformOrientation;
+  knifeActive: boolean;
+  onKnifeActiveChange(active: boolean): void;
 }) {
   const [move, setMove] = useState<Values>({ x: 0, y: 0, z: 0 });
   const [rotate, setRotate] = useState<Values>({ x: 0, y: 0, z: 0 });
@@ -177,15 +184,17 @@ export function ElementTransformPanel({
   ) => {
     try {
       onPreview(
-        operation === "move"
-          ? editor.previewTranslateSelected(values)
-          : operation === "scale"
-            ? editor.previewScaleSelected(values)
-            : editor.previewRotateSelected({
+        editor.previewTransformSelectedInFrame(
+          operation === "move" ? "translate" : operation,
+          operation === "rotate"
+            ? {
                 x: (values.x * Math.PI) / 180,
                 y: (values.y * Math.PI) / 180,
                 z: (values.z * Math.PI) / 180,
-              }),
+              }
+            : values,
+          transformOrientation,
+        ),
       );
     } catch (error) {
       onPreview(undefined);
@@ -251,7 +260,11 @@ export function ElementTransformPanel({
         <button
           type="button"
           onClick={() => {
-            editor.translateSelected(move);
+            editor.transformSelectedInFrame(
+              "translate",
+              move,
+              transformOrientation,
+            );
             onPreview(undefined);
           }}
         >
@@ -265,11 +278,15 @@ export function ElementTransformPanel({
           type="button"
           onClick={() =>
             run(() => {
-              editor.rotateSelected({
-                x: (rotate.x * Math.PI) / 180,
-                y: (rotate.y * Math.PI) / 180,
-                z: (rotate.z * Math.PI) / 180,
-              });
+              editor.transformSelectedInFrame(
+                "rotate",
+                {
+                  x: (rotate.x * Math.PI) / 180,
+                  y: (rotate.y * Math.PI) / 180,
+                  z: (rotate.z * Math.PI) / 180,
+                },
+                transformOrientation,
+              );
               onPreview(undefined);
             })
           }
@@ -283,7 +300,11 @@ export function ElementTransformPanel({
         <button
           type="button"
           onClick={() => {
-            editor.scaleSelected(scale);
+            editor.transformSelectedInFrame(
+              "scale",
+              scale,
+              transformOrientation,
+            );
             onPreview(undefined);
           }}
         >
@@ -343,9 +364,18 @@ export function ElementTransformPanel({
           <Scissors aria-hidden="true" />
           分割
         </button>
+        <button
+          type="button"
+          className={knifeActive ? "active" : undefined}
+          aria-pressed={knifeActive}
+          onClick={() => onKnifeActiveChange(!knifeActive)}
+        >
+          <Scissors aria-hidden="true" />
+          Knife操作
+        </button>
         <button type="button" onClick={() => openModelingDialog("knife")}>
           <Scissors aria-hidden="true" />
-          Knife
+          Knife数値
         </button>
         <button type="button" onClick={() => openModelingDialog("loopCut")}>
           <BetweenHorizontalEnd aria-hidden="true" />
