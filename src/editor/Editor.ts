@@ -262,6 +262,15 @@ export class Editor {
   translateSelected(delta: Vector3Value): void {
     this.#translateSelected(() => delta);
   }
+  previewTranslateSelected(
+    delta: Vector3Value,
+  ): readonly ModelObjectSnapshot[] {
+    return this.#previewSelectedTransform((position) => ({
+      x: position.x + delta.x,
+      y: position.y + delta.y,
+      z: position.z + delta.z,
+    }));
+  }
   translateSelectedInWorld(delta: Vector3Value): void {
     this.#translateSelected((objectId) => {
       const object = this.document.getObject(objectId);
@@ -355,6 +364,14 @@ export class Editor {
       z: pivot.z + (position.z - pivot.z) * scale.z,
     }));
   }
+  previewScaleSelected(scale: Vector3Value): readonly ModelObjectSnapshot[] {
+    const pivot = this.#selectionPivot();
+    return this.#previewSelectedTransform((position) => ({
+      x: pivot.x + (position.x - pivot.x) * scale.x,
+      y: pivot.y + (position.y - pivot.y) * scale.y,
+      z: pivot.z + (position.z - pivot.z) * scale.z,
+    }));
+  }
   rotateSelected(rotation: Vector3Value): void {
     const pivot = this.#selectionPivot();
     const [cx, sx, cy, sy, cz, sz] = [
@@ -366,6 +383,28 @@ export class Editor {
       Math.sin(rotation.z),
     ];
     this.#transformSelected("要素を回転", (position) => {
+      let x = position.x - pivot.x;
+      let y = position.y - pivot.y;
+      let z = position.z - pivot.z;
+      [y, z] = [y * cx - z * sx, y * sx + z * cx];
+      [x, z] = [x * cy + z * sy, -x * sy + z * cy];
+      [x, y] = [x * cz - y * sz, x * sz + y * cz];
+      return { x: x + pivot.x, y: y + pivot.y, z: z + pivot.z };
+    });
+  }
+  previewRotateSelected(
+    rotation: Vector3Value,
+  ): readonly ModelObjectSnapshot[] {
+    const pivot = this.#selectionPivot();
+    const [cx, sx, cy, sy, cz, sz] = [
+      Math.cos(rotation.x),
+      Math.sin(rotation.x),
+      Math.cos(rotation.y),
+      Math.sin(rotation.y),
+      Math.cos(rotation.z),
+      Math.sin(rotation.z),
+    ];
+    return this.#previewSelectedTransform((position) => {
       let x = position.x - pivot.x;
       let y = position.y - pivot.y;
       let z = position.z - pivot.z;
@@ -684,6 +723,24 @@ export class Editor {
       groups.set(item.objectId, values);
     }
     return groups;
+  }
+  #previewSelectedTransform(
+    transform: (position: Vector3Value) => Vector3Value,
+  ): readonly ModelObjectSnapshot[] {
+    const previews = new Map<ObjectId, EditableMesh>();
+    for (const objectId of new Set(
+      this.selection.items.map((item) => item.objectId),
+    )) {
+      const object = this.document.getObject(objectId);
+      if (!object) continue;
+      const mesh = object.mesh.clone();
+      mesh.transformVertices(this.#selectedVertices(objectId), transform);
+      previews.set(objectId, mesh);
+    }
+    return this.document.toSnapshot().map((object) => {
+      const mesh = previews.get(object.id);
+      return mesh ? { ...object, mesh: mesh.toMeshData() } : object;
+    });
   }
   #transformSelected(
     label: string,

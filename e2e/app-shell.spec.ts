@@ -217,6 +217,28 @@ test("previews and commits a face inset dialog", async ({ page }) => {
   await expect(page.getByText("面: 1")).toBeVisible();
 });
 
+test("previews numeric element transforms before applying", async ({
+  page,
+}) => {
+  await page.goto("/?renderer=webgl2");
+  await page.getByRole("button", { name: "Plane追加" }).click();
+  const modes = page.getByLabel("選択モード");
+  await modes.getByRole("button", { name: "Edge" }).click();
+  await modes.getByRole("button", { name: "Face" }).click();
+  const viewport = page.getByTestId("viewport-canvas");
+  await viewport.click();
+  await page.keyboard.press("ControlOrMeta+A");
+
+  const move = page.locator("fieldset").filter({ hasText: "相対移動" });
+  await move.getByLabel("x軸").fill("1.5");
+  await expect(viewport).toHaveAttribute("data-modeling-preview", "true");
+  await expect(page.getByText("モデリングプレビュー")).toBeVisible();
+  await move.getByRole("button", { name: "適用" }).click();
+  await expect(viewport).toHaveAttribute("data-modeling-preview", "false");
+  await page.getByRole("button", { name: "元に戻す" }).click();
+  await expect(page.getByRole("button", { name: "やり直す" })).toBeEnabled();
+});
+
 test("selects vertices with box and lasso gestures", async ({ page }) => {
   await page.goto("/?renderer=webgl2");
   await page.getByRole("button", { name: "Box追加" }).click();

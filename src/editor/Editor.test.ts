@@ -222,6 +222,21 @@ describe("Editor", () => {
     editor.selectEdgeLoop();
     expect(editor.getSnapshot().selectionItems).toHaveLength(4);
   });
+  it("previews numeric transforms without changing document history", () => {
+    const editor = new Editor();
+    const objectId = editor.createBox();
+    editor.setSelectionMode("vertex");
+    const vertexId = editor.getSnapshot().objects[0]!.mesh.vertexIds[0]!;
+    editor.selectElement({ objectId, elementId: vertexId });
+    const before = editor.getSnapshot();
+
+    const moved = editor.previewTranslateSelected({ x: 2, y: 0, z: 0 });
+    expect(moved[0]!.mesh.positions[0]).toBe(
+      before.objects[0]!.mesh.positions[0]! + 2,
+    );
+    expect(editor.getSnapshot().objects).toEqual(before.objects);
+    expect(editor.getSnapshot().canUndo).toBe(before.canUndo);
+  });
   it("converts gizmo movement from world space into object-local space", () => {
     const editor = new Editor();
     const objectId = editor.createBox();

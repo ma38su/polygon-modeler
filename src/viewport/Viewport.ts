@@ -112,6 +112,7 @@ export class Viewport {
     gridSize: 0.5,
   };
   #transformInteractionBlocked = false;
+  #fineTransform = false;
   #transformCommitListener?: TransformCommitListener;
   #elementTransformCommitListener?: ElementTransformCommitListener;
   #selectedObjectId?: ObjectId;
@@ -142,6 +143,8 @@ export class Viewport {
 
     this.#resizeObserver = new ResizeObserver(() => this.#resize());
     this.#resizeObserver.observe(element);
+    window.addEventListener("keydown", this.#handleFineTransformKey);
+    window.addEventListener("keyup", this.#handleFineTransformKey);
   }
 
   async initialize(): Promise<void> {
@@ -251,9 +254,7 @@ export class Viewport {
 
   setSnapSettings(settings: SnapSettings): void {
     this.#snapSettings = settings;
-    this.#transformControls?.setTranslationSnap(
-      settings.grid ? settings.gridSize : null,
-    );
+    this.#updateTransformSnapping();
   }
 
   setTransformInteractionBlocked(blocked: boolean): void {
@@ -278,6 +279,8 @@ export class Viewport {
     this.#controls?.dispose();
     this.#removePointerListeners();
     this.#disposeTransformControls();
+    window.removeEventListener("keydown", this.#handleFineTransformKey);
+    window.removeEventListener("keyup", this.#handleFineTransformKey);
     if (this.#animationFrame !== undefined) {
       cancelAnimationFrame(this.#animationFrame);
     }
@@ -371,9 +374,6 @@ export class Viewport {
       this.#renderer.domElement,
     );
     controls.setMode(this.#transformMode);
-    controls.setTranslationSnap(
-      this.#snapSettings.grid ? this.#snapSettings.gridSize : null,
-    );
     controls.addEventListener("dragging-changed", (event) => {
       if (this.#controls) this.#controls.enabled = !event.value;
     });
@@ -381,6 +381,7 @@ export class Viewport {
     controls.addEventListener("objectChange", this.#handleTransformPreview);
     controls.addEventListener("mouseUp", this.#handleTransformEnd);
     this.#transformControls = controls;
+    this.#updateTransformSnapping();
     this.setAxisConstraint(this.#axisConstraint);
     this.#scene.add(controls.getHelper());
   }
@@ -391,6 +392,31 @@ export class Viewport {
     this.#scene.remove(this.#transformControls.getHelper());
     this.#transformControls.dispose();
     this.#transformControls = undefined;
+  }
+
+  #handleFineTransformKey = (event: KeyboardEvent): void => {
+    if (event.key !== "Shift") return;
+    const fine = event.type === "keydown";
+    if (fine === this.#fineTransform) return;
+    this.#fineTransform = fine;
+    this.#updateTransformSnapping();
+  };
+
+  #updateTransformSnapping(): void {
+    if (!this.#transformControls) return;
+    this.#transformControls.setTranslationSnap(
+      this.#fineTransform
+        ? this.#snapSettings.grid
+          ? this.#snapSettings.gridSize / 10
+          : 0.05
+        : this.#snapSettings.grid
+          ? this.#snapSettings.gridSize
+          : null,
+    );
+    this.#transformControls.setRotationSnap(
+      this.#fineTransform ? Math.PI / 180 : null,
+    );
+    this.#transformControls.setScaleSnap(this.#fineTransform ? 0.01 : null);
   }
 
   #attachSelectedObject(): void {

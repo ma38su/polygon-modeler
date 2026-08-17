@@ -117,7 +117,32 @@ export function ElementTransformPanel({
       onError(error instanceof Error ? error.message : String(error));
     }
   };
-  const fields = (values: Values, setValues: (value: Values) => void) => (
+  const previewTransform = (
+    operation: "move" | "rotate" | "scale",
+    values: Values,
+  ) => {
+    try {
+      onPreview(
+        operation === "move"
+          ? editor.previewTranslateSelected(values)
+          : operation === "scale"
+            ? editor.previewScaleSelected(values)
+            : editor.previewRotateSelected({
+                x: (values.x * Math.PI) / 180,
+                y: (values.y * Math.PI) / 180,
+                z: (values.z * Math.PI) / 180,
+              }),
+      );
+    } catch (error) {
+      onPreview(undefined);
+      onError(error instanceof Error ? error.message : String(error));
+    }
+  };
+  const fields = (
+    operation: "move" | "rotate" | "scale",
+    values: Values,
+    setValues: (value: Values) => void,
+  ) => (
     <div className="vector-fields">
       {(["x", "y", "z"] as const).map((axis) => (
         <label key={axis}>
@@ -127,12 +152,15 @@ export function ElementTransformPanel({
             type="number"
             step="0.1"
             value={values[axis]}
-            onChange={(event) =>
-              setValues({
+            onChange={(event) => {
+              const next = {
                 ...values,
                 [axis]: Number(event.currentTarget.value),
-              })
-            }
+              };
+              setValues(next);
+              if (Object.values(next).every(Number.isFinite))
+                previewTransform(operation, next);
+            }}
           />
         </label>
       ))}
@@ -161,21 +189,30 @@ export function ElementTransformPanel({
       </fieldset>
       <fieldset>
         <legend>相対移動</legend>
-        {fields(move, setMove)}
-        <button type="button" onClick={() => editor.translateSelected(move)}>
+        {fields("move", move, setMove)}
+        <button
+          type="button"
+          onClick={() => {
+            editor.translateSelected(move);
+            onPreview(undefined);
+          }}
+        >
           適用
         </button>
       </fieldset>
       <fieldset>
         <legend>回転（度）</legend>
-        {fields(rotate, setRotate)}
+        {fields("rotate", rotate, setRotate)}
         <button
           type="button"
           onClick={() =>
-            editor.rotateSelected({
-              x: (rotate.x * Math.PI) / 180,
-              y: (rotate.y * Math.PI) / 180,
-              z: (rotate.z * Math.PI) / 180,
+            run(() => {
+              editor.rotateSelected({
+                x: (rotate.x * Math.PI) / 180,
+                y: (rotate.y * Math.PI) / 180,
+                z: (rotate.z * Math.PI) / 180,
+              });
+              onPreview(undefined);
             })
           }
         >
@@ -184,8 +221,14 @@ export function ElementTransformPanel({
       </fieldset>
       <fieldset>
         <legend>スケール</legend>
-        {fields(scale, setScale)}
-        <button type="button" onClick={() => editor.scaleSelected(scale)}>
+        {fields("scale", scale, setScale)}
+        <button
+          type="button"
+          onClick={() => {
+            editor.scaleSelected(scale);
+            onPreview(undefined);
+          }}
+        >
           適用
         </button>
       </fieldset>
