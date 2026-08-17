@@ -1,7 +1,11 @@
 import type { EditorCommand } from "./EditorCommand";
 import type { ModelDocument } from "../document/ModelDocument";
 import { ModelObject } from "../document/ModelObject";
-import type { ObjectId, TransformValue } from "../document/types";
+import type {
+  MaterialValue,
+  ObjectId,
+  TransformValue,
+} from "../document/types";
 export class CreateObjectCommand implements EditorCommand {
   readonly label = "オブジェクトを作成";
   readonly object: ModelObject;
@@ -61,5 +65,30 @@ export class TransformObjectCommand implements EditorCommand {
     const object = document.getObject(this.id);
     if (!object) throw new Error(`Object not found: ${this.id}`);
     object.transform = transform;
+  }
+}
+export class SetObjectMaterialCommand implements EditorCommand {
+  readonly label = "マテリアルを変更";
+  readonly id: ObjectId;
+  readonly before: MaterialValue;
+  readonly after: MaterialValue;
+  constructor(id: ObjectId, before: MaterialValue, after: MaterialValue) {
+    this.id = id;
+    this.before = before;
+    this.after = after;
+  }
+  execute(document: ModelDocument) {
+    this.#apply(document, this.after);
+  }
+  undo(document: ModelDocument) {
+    this.#apply(document, this.before);
+  }
+  redo(document: ModelDocument) {
+    this.#apply(document, this.after);
+  }
+  #apply(document: ModelDocument, material: MaterialValue) {
+    const object = document.getObject(this.id);
+    if (!object) throw new Error(`Object not found: ${this.id}`);
+    object.material = material;
   }
 }

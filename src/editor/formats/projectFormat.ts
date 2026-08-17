@@ -1,4 +1,5 @@
-import { ModelObject } from "../document/ModelObject";
+import { defaultMaterial, ModelObject } from "../document/ModelObject";
+import type { MaterialValue } from "../document/types";
 import type { HalfEdgeId, ObjectId, VertexId } from "../document/types";
 import { EditableMesh, type EditableMeshArchive } from "../mesh/EditableMesh";
 import { validateMesh } from "../mesh/validateMesh";
@@ -24,6 +25,7 @@ interface ProjectRecord {
     readonly name: string;
     readonly visible: boolean;
     readonly transform: ModelObject["transform"];
+    readonly material?: MaterialValue;
     readonly mesh: ProjectMeshRecord;
   }[];
 }
@@ -104,6 +106,7 @@ export function serializeProject(objects: readonly ModelObject[]): string {
         name: object.name,
         visible: object.visible,
         transform: object.transform,
+        material: object.material,
         mesh: {
           halfEdges: archive.halfEdges,
           edges: archive.edges,
@@ -178,6 +181,7 @@ export function deserializeProject(source: string): ModelObject[] {
     const object = new ModelObject(item.id, item.name, mesh);
     object.visible = item.visible;
     object.transform = item.transform;
+    object.material = item.material ?? defaultMaterial();
     return object;
   });
 }

@@ -13,6 +13,13 @@ export interface TransformValue {
   readonly rotation: Vector3Value;
   readonly scale: Vector3Value;
 }
+export type ShadingModel = "basic" | "lambert" | "phong" | "standard";
+export interface MaterialValue {
+  readonly color: string;
+  readonly shading: ShadingModel;
+  readonly roughness: number;
+  readonly metalness: number;
+}
 export interface MeshData {
   readonly positions: readonly number[];
   readonly faces: readonly (readonly number[])[];
@@ -29,6 +36,7 @@ export interface ModelObjectSnapshot {
   readonly name: string;
   readonly visible: boolean;
   readonly transform: TransformValue;
+  readonly material: MaterialValue;
   readonly mesh: MeshData;
 }
 export interface EditorSnapshot {

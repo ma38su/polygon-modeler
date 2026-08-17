@@ -10,6 +10,8 @@ import {
   Matrix4,
   Mesh,
   MeshBasicMaterial,
+  MeshLambertMaterial,
+  MeshPhongMaterial,
   MeshStandardMaterial,
   SphereGeometry,
 } from "three";
@@ -27,11 +29,17 @@ const baseColor = new Color(0x6f7d91);
 const vertexColor = new Color(0xd7e2f2);
 const selectedColor = new Color(0x55d98b);
 const VERTEX_RADIUS = 0.025;
+type SurfaceMaterial =
+  | MeshBasicMaterial
+  | MeshLambertMaterial
+  | MeshPhongMaterial
+  | MeshStandardMaterial;
 
 export class RenderGeometryAdapter {
   readonly group = new Group();
   readonly #meshes = new Map<ObjectId, Mesh>();
   readonly #meshRevisions = new Map<ObjectId, string>();
+  readonly #materialRevisions = new Map<ObjectId, string>();
   sync(
     objects: readonly ModelObjectSnapshot[],
     selectedIds: ReadonlySet<ObjectId>,
@@ -50,10 +58,17 @@ export class RenderGeometryAdapter {
         this.#meshes.set(object.id, mesh);
         this.group.add(mesh);
         this.#meshRevisions.set(object.id, geometryRevision);
+        this.#materialRevisions.set(object.id, JSON.stringify(object.material));
       } else if (this.#meshRevisions.get(object.id) !== geometryRevision) {
         mesh.geometry.dispose();
         mesh.geometry = this.#createGeometry(object);
         this.#meshRevisions.set(object.id, geometryRevision);
+      }
+      const materialRevision = JSON.stringify(object.material);
+      if (this.#materialRevisions.get(object.id) !== materialRevision) {
+        (mesh.material as SurfaceMaterial).dispose();
+        mesh.material = this.#createMaterial(object);
+        this.#materialRevisions.set(object.id, materialRevision);
       }
       mesh.name = object.name;
       mesh.visible = object.visible;
@@ -72,11 +87,12 @@ export class RenderGeometryAdapter {
         object.transform.scale.y,
         object.transform.scale.z,
       );
-      const material = mesh.material as MeshStandardMaterial;
+      const material = mesh.material as SurfaceMaterial;
       const objectSelected =
         selectionItems.length === 0 && selectedIds.has(object.id);
-      material.color.set(objectSelected ? 0x78a0ff : 0x9aa5b5);
-      material.emissive.set(objectSelected ? 0x172a55 : 0x000000);
+      material.color
+        .set(object.material.color)
+        .lerp(new Color(0x78a0ff), objectSelected ? 0.45 : 0);
       material.transparent = !displayLayers.faces;
       material.opacity = displayLayers.faces ? 1 : 0;
       material.depthWrite = displayLayers.faces;
@@ -101,15 +117,22 @@ export class RenderGeometryAdapter {
       Group | undefined;
   }
   #createMesh(object: ModelObjectSnapshot): Mesh {
-    return new Mesh(
-      this.#createGeometry(object),
-      new MeshStandardMaterial({
-        color: 0x9aa5b5,
-        roughness: 0.72,
-        metalness: 0.05,
-        side: DoubleSide,
-      }),
-    );
+    return new Mesh(this.#createGeometry(object), this.#createMaterial(object));
+  }
+
+  #createMaterial(object: ModelObjectSnapshot): SurfaceMaterial {
+    const common = { color: object.material.color, side: DoubleSide };
+    if (object.material.shading === "basic")
+      return new MeshBasicMaterial(common);
+    if (object.material.shading === "lambert")
+      return new MeshLambertMaterial(common);
+    if (object.material.shading === "phong")
+      return new MeshPhongMaterial({ ...common, shininess: 48 });
+    return new MeshStandardMaterial({
+      ...common,
+      roughness: object.material.roughness,
+      metalness: object.material.metalness,
+    });
   }
 
   #createGeometry(object: ModelObjectSnapshot): BufferGeometry {
@@ -314,5 +337,6 @@ export class RenderGeometryAdapter {
     this.#disposeObject(mesh);
     this.#meshes.delete(id);
     this.#meshRevisions.delete(id);
+    this.#materialRevisions.delete(id);
   }
 }

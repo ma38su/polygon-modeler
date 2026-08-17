@@ -10,13 +10,18 @@ import { GLTFExporter } from "three/examples/jsm/exporters/GLTFExporter.js";
 import { STLExporter } from "three/examples/jsm/exporters/STLExporter.js";
 import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader.js";
 import { STLLoader } from "three/examples/jsm/loaders/STLLoader.js";
-import type { ModelObjectSnapshot, Vector3Value } from "../document/types";
+import type {
+  MaterialValue,
+  ModelObjectSnapshot,
+  Vector3Value,
+} from "../document/types";
 import { EditableMesh } from "../mesh/EditableMesh";
 import { triangulate } from "../mesh/triangulate";
 
 export interface ImportedMesh {
   readonly name: string;
   readonly mesh: EditableMesh;
+  readonly material?: MaterialValue;
 }
 
 function validateExportObjects(
@@ -46,7 +51,14 @@ function createScene(
     );
     geometry.setIndex(triangulate(object.mesh));
     geometry.computeVertexNormals();
-    const mesh = new Mesh(geometry, new MeshStandardMaterial());
+    const mesh = new Mesh(
+      geometry,
+      new MeshStandardMaterial({
+        color: object.material.color,
+        roughness: object.material.roughness,
+        metalness: object.material.metalness,
+      }),
+    );
     mesh.name = object.name;
     mesh.position.set(
       object.transform.position.x * unitScale,
@@ -153,9 +165,19 @@ export async function importGlb(data: ArrayBuffer): Promise<ImportedMesh[]> {
   gltf.scene.updateMatrixWorld(true);
   gltf.scene.traverse((object) => {
     if (object instanceof Mesh && object.geometry) {
+      const sourceMaterial = Array.isArray(object.material)
+        ? object.material[0]
+        : object.material;
+      const standard = sourceMaterial as MeshStandardMaterial;
       result.push({
         name: object.name || `GLB Mesh ${result.length + 1}`,
         mesh: geometryToEditableMesh(object.geometry, object.matrixWorld, 1),
+        material: {
+          color: `#${standard.color?.getHexString() ?? "9aa5b5"}`,
+          shading: "standard",
+          roughness: standard.roughness ?? 0.72,
+          metalness: standard.metalness ?? 0.05,
+        },
       });
     }
   });

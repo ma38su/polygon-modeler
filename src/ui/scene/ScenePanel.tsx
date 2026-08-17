@@ -16,6 +16,7 @@ import type { Editor } from "../../editor/Editor";
 import type { EditorSnapshot } from "../../editor/document/types";
 import { ElementTransformPanel } from "../inspector/ElementTransformPanel";
 import { TransformInspector } from "../inspector/TransformInspector";
+import { MaterialInspector } from "../inspector/MaterialInspector";
 import { diagnoseMesh } from "../../editor/mesh/meshDiagnostics";
 
 interface ScenePanelProps {
@@ -161,6 +162,7 @@ export function ScenePanel({
         ) : selectedObject ? (
           <>
             <TransformInspector editor={editor} object={selectedObject} />
+            <MaterialInspector editor={editor} object={selectedObject} />
             <div className="mesh-diagnostics" aria-label="メッシュ診断">
               <h3>メッシュ診断</h3>
               <dl>

@@ -41,6 +41,12 @@ describe("exchange formats", () => {
       rotation: { x: 0, y: 0, z: 0 },
       scale: { x: 1, y: 1, z: 1 },
     };
+    object.material = {
+      color: "#336699",
+      shading: "standard",
+      roughness: 0.3,
+      metalness: 0.8,
+    };
     const imported = await importGlb(await exportGlb([object.toSnapshot()]));
     const xs = [...imported[0]!.mesh.vertices.values()].map(
       (vertex) => vertex.position.x,
@@ -48,5 +54,10 @@ describe("exchange formats", () => {
     expect(imported[0]!.name).toBe("GLB_Box");
     expect(Math.min(...xs)).toBeCloseTo(2);
     expect(Math.max(...xs)).toBeCloseTo(4);
+    expect(imported[0]!.material).toMatchObject({
+      color: "#336699",
+      roughness: 0.3,
+      metalness: 0.8,
+    });
   });
 });

@@ -339,6 +339,49 @@ kbd {
   border-radius: var(--radius-md);
   background: var(--surface-1);
 }
+.material-inspector {
+  display: grid;
+  gap: var(--space-2);
+  margin: var(--space-3);
+  padding: var(--space-3);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--surface-1);
+}
+.material-inspector h3 {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+  margin: 0 0 var(--space-1);
+  font-size: var(--font-size-sm);
+}
+.material-inspector h3 svg {
+  width: 14px;
+  height: 14px;
+}
+.material-inspector label {
+  display: grid;
+  grid-template-columns: minmax(72px, 0.8fr) minmax(0, 1.2fr);
+  align-items: center;
+  gap: var(--space-2);
+  color: var(--text-muted);
+}
+.material-inspector input,
+.material-inspector select {
+  min-width: 0;
+  width: 100%;
+  min-height: var(--control-sm);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  color: var(--text-primary);
+  background: var(--surface-2);
+}
+.material-inspector input[type="color"] {
+  padding: 2px;
+}
+.material-inspector .disabled {
+  opacity: 0.45;
+}
 .mesh-diagnostics h3 {
   margin: 0 0 var(--space-2);
   font-size: var(--font-size-sm);

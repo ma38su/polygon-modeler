@@ -472,4 +472,22 @@ describe("Editor", () => {
     expect(editor.getSnapshot().objects).toHaveLength(1);
     expect(editor.getSnapshot().objects[0]!.mesh.faces).toHaveLength(6);
   });
+  it("updates object material with undo and preserves it when duplicated", () => {
+    const editor = new Editor();
+    const objectId = editor.createBox();
+    editor.setObjectMaterial(objectId, {
+      color: "#ff8844",
+      shading: "phong",
+      roughness: 0.2,
+      metalness: 0.8,
+    });
+    expect(editor.getSnapshot().objects[0]!.material.color).toBe("#ff8844");
+    editor.undo();
+    expect(editor.getSnapshot().objects[0]!.material.shading).toBe("standard");
+    editor.redo();
+    editor.duplicateSelectedObjects();
+    expect(editor.getSnapshot().objects[1]!.material).toEqual(
+      editor.getSnapshot().objects[0]!.material,
+    );
+  });
 });

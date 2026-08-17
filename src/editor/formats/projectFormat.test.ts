@@ -21,6 +21,12 @@ describe("project format", () => {
       rotation: { x: 0.1, y: 0.2, z: 0.3 },
       scale: { x: 2, y: 3, z: 4 },
     };
+    original.material = {
+      color: "#336699",
+      shading: "phong",
+      roughness: 0.25,
+      metalness: 0.75,
+    };
     const restored = deserializeProject(serializeProject([original]))[0]!;
     expect(restored.toSnapshot()).toEqual(original.toSnapshot());
     expect(restored.mesh.toArchive()).toEqual(original.mesh.toArchive());

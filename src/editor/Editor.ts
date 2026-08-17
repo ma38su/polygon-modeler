@@ -4,6 +4,7 @@ import type {
   EdgeId,
   EditorSnapshot,
   FaceId,
+  MaterialValue,
   ModelObjectSnapshot,
   ObjectId,
   VertexId,
@@ -18,6 +19,7 @@ import { CommandHistory } from "./history/CommandHistory";
 import {
   CreateObjectCommand,
   DeleteObjectCommand,
+  SetObjectMaterialCommand,
   TransformObjectCommand,
 } from "./commands/objectCommands";
 import type { TransformValue } from "./document/types";
@@ -65,6 +67,7 @@ import {
   type BooleanOperation,
 } from "./boolean/booleanOperations";
 type Listener = () => void;
+const clampUnit = (value: number) => Math.min(1, Math.max(0, value));
 export class Editor {
   readonly document = new ModelDocument();
   readonly #listeners = new Set<Listener>();
@@ -99,11 +102,13 @@ export class Editor {
       const validation = validateMesh(item.mesh);
       if (!validation.valid) throw new Error(validation.errors.join("\n"));
       const sequence = this.#nextObjectId++;
-      return new ModelObject(
+      const object = new ModelObject(
         `object-${sequence}` as ObjectId,
         item.name || `Imported ${sequence}`,
         item.mesh,
       );
+      if (item.material) object.material = structuredClone(item.material);
+      return object;
     });
     this.history.execute(
       new CompositeCommand(
@@ -163,6 +168,7 @@ export class Editor {
         source.mesh.clone(),
       );
       copy.transform = structuredClone(source.transform);
+      copy.material = structuredClone(source.material);
       copy.visible = source.visible;
       return copy;
     });
@@ -190,6 +196,7 @@ export class Editor {
         mirrorMesh(source.mesh, axis),
       );
       copy.transform = structuredClone(source.transform);
+      copy.material = structuredClone(source.material);
       copy.visible = source.visible;
       return copy;
     });
@@ -215,6 +222,7 @@ export class Editor {
       `Joined ${sequence}`,
       joinObjectMeshes(sources.map((object) => object.toSnapshot())),
     );
+    joined.material = structuredClone(sources[0]!.material);
     this.history.execute(
       new CompositeCommand("オブジェクトを結合", [
         new DeleteObjectCommand(sources.map((source) => source.id)),
@@ -284,6 +292,7 @@ export class Editor {
       `${labels[operation]} ${sequence}`,
       resultMesh,
     );
+    result.material = structuredClone(sources[0]!.material);
     this.history.execute(
       new CompositeCommand(`Boolean ${labels[operation]}`, [
         new DeleteObjectCommand(sourceIds),
@@ -315,6 +324,7 @@ export class Editor {
         extractFaces(object.mesh, faces, true),
       );
       separated.transform = structuredClone(object.transform);
+      separated.material = structuredClone(object.material);
       commands.push(
         new EditMeshCommand("面を分離", objectId, object.mesh, remaining),
         new CreateObjectCommand(separated),
@@ -434,6 +444,22 @@ export class Editor {
     if (!object) return;
     this.history.execute(
       new TransformObjectCommand(id, object.transform, transform),
+      this.document,
+    );
+    this.#commit(true);
+  }
+  setObjectMaterial(id: ObjectId, material: MaterialValue): void {
+    const object = this.document.getObject(id);
+    if (!object) return;
+    if (!/^#[0-9a-f]{6}$/i.test(material.color))
+      throw new Error("マテリアル色は#RRGGBB形式で指定してください");
+    const normalized = {
+      ...material,
+      roughness: clampUnit(material.roughness),
+      metalness: clampUnit(material.metalness),
+    };
+    this.history.execute(
+      new SetObjectMaterialCommand(id, object.material, normalized),
       this.document,
     );
     this.#commit(true);

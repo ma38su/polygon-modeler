@@ -107,6 +107,28 @@ describe("RenderGeometryAdapter selection overlays", () => {
     expect(selectedFaces.geometry.getIndex()?.count).toBe(12);
     adapter.dispose();
   });
+  it("creates the selected shading material and updates PBR parameters", () => {
+    const adapter = new RenderGeometryAdapter();
+    const source = new ModelObject(objectId, "Box", createBoxMesh());
+    source.material = {
+      color: "#ff8844",
+      shading: "phong",
+      roughness: 0.3,
+      metalness: 0.7,
+    };
+    adapter.sync([source.toSnapshot()], new Set(), []);
+    expect(
+      (adapter.getMesh(objectId)!.material as import("three").MeshPhongMaterial)
+        .isMeshPhongMaterial,
+    ).toBe(true);
+    source.material = { ...source.material, shading: "standard" };
+    adapter.sync([source.toSnapshot()], new Set(), []);
+    const material = adapter.getMesh(objectId)!
+      .material as import("three").MeshStandardMaterial;
+    expect(material.roughness).toBe(0.3);
+    expect(material.metalness).toBe(0.7);
+    adapter.dispose();
+  });
 
   it("renders face normals only when the diagnostic layer is enabled", () => {
     const adapter = new RenderGeometryAdapter();
