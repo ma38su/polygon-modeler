@@ -85,6 +85,11 @@ test("shows the empty editor shell", async ({ page }) => {
   );
   await displayLayers.getByRole("button", { name: "Face" }).click();
   const snapControls = page.getByLabel("スナップと軸制限");
+  await snapControls.getByRole("button", { name: "Normal" }).click();
+  await expect(page.getByTestId("viewport-canvas")).toHaveAttribute(
+    "data-transform-orientation",
+    "normal",
+  );
   await snapControls.getByRole("button", { name: "Grid" }).click();
   await snapControls.getByRole("button", { name: "Vertex" }).click();
   await snapControls.getByRole("button", { name: "X", exact: true }).click();

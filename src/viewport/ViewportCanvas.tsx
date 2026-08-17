@@ -16,6 +16,7 @@ import type {
 } from "../editor/selection/SelectionManager";
 import type { DisplayLayers } from "./displayLayers";
 import type { RegionShape, ScreenPoint } from "./picking/RegionPicker";
+import type { TransformOrientation } from "./transform/elementSelection";
 
 export type SelectionGesture = "click" | RegionShape;
 
@@ -34,6 +35,7 @@ export interface ViewportCanvasProps {
   selectionGesture: SelectionGesture;
   onPickRegion(items: readonly SelectionItem[], additive: boolean): void;
   axisConstraint: AxisConstraint;
+  transformOrientation: TransformOrientation;
   snapSettings: SnapSettings;
   modelingPreviewActive: boolean;
   geometryEpoch: number;
@@ -54,6 +56,7 @@ export function ViewportCanvas({
   selectionGesture,
   onPickRegion,
   axisConstraint,
+  transformOrientation,
   snapSettings,
   modelingPreviewActive,
   geometryEpoch,
@@ -105,6 +108,10 @@ export function ViewportCanvas({
     [axisConstraint],
   );
   useEffect(
+    () => viewportRef.current?.setTransformOrientation(transformOrientation),
+    [transformOrientation],
+  );
+  useEffect(
     () => viewportRef.current?.setSnapSettings(snapSettings),
     [snapSettings],
   );
@@ -135,6 +142,7 @@ export function ViewportCanvas({
       data-display-faces={displayLayers.faces}
       data-selection-gesture={selectionGesture}
       data-axis-constraint={axisConstraint}
+      data-transform-orientation={transformOrientation}
       data-grid-snap={snapSettings.grid}
       data-vertex-snap={snapSettings.vertex}
       data-edge-snap={snapSettings.edge}

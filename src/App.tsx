@@ -30,6 +30,7 @@ import type {
   SnapSettings,
   TransformMode,
 } from "./viewport/Viewport";
+import type { TransformOrientation } from "./viewport/transform/elementSelection";
 import {
   DEFAULT_DISPLAY_LAYERS,
   type DisplayLayers,
@@ -62,6 +63,8 @@ export default function App() {
   const [selectionGesture, setSelectionGesture] =
     useState<SelectionGesture>("click");
   const [axisConstraint, setAxisConstraint] = useState<AxisConstraint>("all");
+  const [transformOrientation, setTransformOrientation] =
+    useState<TransformOrientation>("world");
   const [snapSettings, setSnapSettings] = useState<SnapSettings>({
     grid: false,
     vertex: false,
@@ -336,6 +339,8 @@ export default function App() {
             projection={projection}
             onProjectionChange={setProjection}
             axisConstraint={axisConstraint}
+            transformOrientation={transformOrientation}
+            onTransformOrientationChange={setTransformOrientation}
             onAxisConstraintChange={setAxisConstraint}
             snapSettings={snapSettings}
             onSnapSettingsChange={setSnapSettings}
@@ -362,6 +367,7 @@ export default function App() {
             selectionGesture={selectionGesture}
             onPickRegion={handleRegionPick}
             axisConstraint={axisConstraint}
+            transformOrientation={transformOrientation}
             snapSettings={snapSettings}
             modelingPreviewActive={Boolean(modelingPreview)}
             geometryEpoch={geometryEpoch}

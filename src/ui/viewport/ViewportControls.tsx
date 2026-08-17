@@ -14,6 +14,7 @@ import {
 } from "../../editor/selection/SelectionManager";
 import type { DisplayLayers } from "../../viewport/displayLayers";
 import type { AxisConstraint, SnapSettings } from "../../viewport/Viewport";
+import type { TransformOrientation } from "../../viewport/transform/elementSelection";
 
 const selectionLabels: Record<SelectionMode, string> = {
   vertex: "Vertex",
@@ -41,6 +42,8 @@ interface ViewportControlsProps {
   projection: "perspective" | "orthographic";
   onProjectionChange(projection: "perspective" | "orthographic"): void;
   axisConstraint: AxisConstraint;
+  transformOrientation: TransformOrientation;
+  onTransformOrientationChange(orientation: TransformOrientation): void;
   onAxisConstraintChange(constraint: AxisConstraint): void;
   snapSettings: SnapSettings;
   onSnapSettingsChange(settings: SnapSettings): void;
@@ -54,6 +57,8 @@ export function ViewportControls({
   projection,
   onProjectionChange,
   axisConstraint,
+  transformOrientation,
+  onTransformOrientationChange,
   onAxisConstraintChange,
   snapSettings,
   onSnapSettingsChange,
@@ -116,6 +121,18 @@ export function ViewportControls({
         </button>
       </div>
       <div className="snap-toolbar" aria-label="スナップと軸制限">
+        <span>座標</span>
+        {(["world", "local", "normal"] as const).map((orientation) => (
+          <button
+            type="button"
+            key={orientation}
+            className={transformOrientation === orientation ? "active" : ""}
+            aria-pressed={transformOrientation === orientation}
+            onClick={() => onTransformOrientationChange(orientation)}
+          >
+            {{ world: "World", local: "Local", normal: "Normal" }[orientation]}
+          </button>
+        ))}
         <button
           type="button"
           className={snapSettings.grid ? "active" : ""}

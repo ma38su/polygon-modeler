@@ -1,6 +1,7 @@
 import {
   AxesHelper,
   Color,
+  Euler,
   GridHelper,
   HemisphereLight,
   InstancedMesh,
@@ -10,6 +11,7 @@ import {
   OrthographicCamera,
   Object3D,
   PerspectiveCamera,
+  Quaternion,
   Scene,
   WebGLRenderer,
   type Camera,
@@ -41,7 +43,8 @@ import { findScreenSnap } from "./snapping";
 import {
   collectSnapCandidates,
   selectedVertexIndices,
-  selectionPivotWorld,
+  selectionFrameWorld,
+  type TransformOrientation,
 } from "./transform/elementSelection";
 import {
   canUseWebGpu,
@@ -109,6 +112,7 @@ export class Viewport {
   #transformControls?: TransformControls;
   #transformMode: TransformMode = "translate";
   #axisConstraint: AxisConstraint = "all";
+  #transformOrientation: TransformOrientation = "world";
   #snapSettings: SnapSettings = {
     grid: false,
     vertex: false,
@@ -255,6 +259,10 @@ export class Viewport {
     this.#transformControls.showX = constraint === "all" || constraint === "x";
     this.#transformControls.showY = constraint === "all" || constraint === "y";
     this.#transformControls.showZ = constraint === "all" || constraint === "z";
+  }
+  setTransformOrientation(orientation: TransformOrientation): void {
+    this.#transformOrientation = orientation;
+    this.#attachSelectedObject();
   }
 
   setSnapSettings(settings: SnapSettings): void {
@@ -434,18 +442,24 @@ export class Viewport {
       this.#selectionItems.length === 0 && this.#selectedObjectId
         ? this.#geometryAdapter.getMesh(this.#selectedObjectId)
         : undefined;
-    if (mesh) this.#transformControls.attach(mesh);
-    else if (this.#selectionItems.length > 0) {
-      const pivot = selectionPivotWorld(
+    if (mesh) {
+      this.#transformControls.setSpace("world");
+      this.#transformControls.attach(mesh);
+    } else if (this.#selectionItems.length > 0) {
+      const frame = selectionFrameWorld(
         this.#objects,
         this.#selectionItems,
         this.#geometryAdapter,
+        this.#transformOrientation,
       );
-      if (!pivot) this.#transformControls.detach();
+      if (!frame) this.#transformControls.detach();
       else {
-        this.#elementPivot.position.copy(pivot);
-        this.#elementPivot.rotation.set(0, 0, 0);
+        this.#elementPivot.position.copy(frame.position);
+        this.#elementPivot.quaternion.copy(frame.quaternion);
         this.#elementPivot.scale.set(1, 1, 1);
+        this.#transformControls.setSpace(
+          this.#transformOrientation === "world" ? "world" : "local",
+        );
         this.#transformControls.attach(this.#elementPivot);
       }
     } else this.#transformControls.detach();
@@ -459,7 +473,11 @@ export class Viewport {
           y: this.#elementPivot.position.y,
           z: this.#elementPivot.position.z,
         },
-        rotation: { x: 0, y: 0, z: 0 },
+        rotation: {
+          x: this.#elementPivot.rotation.x,
+          y: this.#elementPivot.rotation.y,
+          z: this.#elementPivot.rotation.z,
+        },
         scale: { x: 1, y: 1, z: 1 },
       };
       this.#captureElementPreview();
@@ -480,7 +498,8 @@ export class Viewport {
       this.#restoreElementPreview();
       const before = this.#transformBefore.position;
       this.#elementPivot.position.set(before.x, before.y, before.z);
-      this.#elementPivot.rotation.set(0, 0, 0);
+      const rotation = this.#transformBefore.rotation;
+      this.#elementPivot.rotation.set(rotation.x, rotation.y, rotation.z);
       this.#elementPivot.scale.set(1, 1, 1);
       this.#transformBefore = undefined;
       if (updates.length)
@@ -572,8 +591,14 @@ export class Viewport {
   }
 
   #elementWorldTransform(): Matrix4 {
-    const before = this.#transformBefore!.position;
-    const initial = new Matrix4().makeTranslation(before.x, before.y, before.z);
+    const { position, rotation } = this.#transformBefore!;
+    const initial = new Matrix4().compose(
+      new Vector3(position.x, position.y, position.z),
+      new Quaternion().setFromEuler(
+        new Euler(rotation.x, rotation.y, rotation.z),
+      ),
+      new Vector3(1, 1, 1),
+    );
     this.#elementPivot.updateMatrix();
     return this.#elementPivot.matrix.clone().multiply(initial.invert());
   }
