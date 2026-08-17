@@ -133,7 +133,7 @@ test("shows the empty editor shell", async ({ page }) => {
   );
 });
 
-test("previews, cancels, commits, and replays a face extrusion", async ({
+test("cancels, commits, and replays a face extrusion dialog", async ({
   page,
 }) => {
   await page.goto("/?renderer=webgl2");
@@ -144,15 +144,20 @@ test("previews, cancels, commits, and replays a face extrusion", async ({
     .click();
   await page.keyboard.press("ControlOrMeta+A");
 
-  const distance = page.getByLabel("押し出し量");
+  await page.getByRole("button", { name: "押し出し" }).click();
+  const dialog = page.getByRole("dialog", { name: "面を押し出す" });
+  await expect(dialog).toBeVisible();
+  const distance = dialog.getByLabel("押し出し量");
   await distance.fill("2");
   await expect(page.getByText("面: 1")).toBeVisible();
-  await page.getByRole("button", { name: "キャンセル" }).click();
-  await expect(distance).toHaveValue("1");
+  await dialog.getByRole("button", { name: "キャンセル" }).click();
+  await expect(dialog).toHaveCount(0);
   await expect(page.getByText("面: 1")).toBeVisible();
 
-  await distance.fill("0.5");
   await page.getByRole("button", { name: "押し出し" }).click();
+  await expect(dialog.getByLabel("押し出し量")).toHaveValue("1");
+  await distance.fill("0.5");
+  await dialog.getByRole("button", { name: "押し出す" }).click();
   await expect(page.getByText("面: 5")).toBeVisible();
   await page.getByRole("button", { name: "元に戻す" }).click();
   await expect(page.getByText("面: 1")).toBeVisible();

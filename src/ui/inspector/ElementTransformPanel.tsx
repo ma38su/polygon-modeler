@@ -1,7 +1,6 @@
 import { useState } from "react";
 import type { Editor } from "../../editor/Editor";
 import {
-  Ban,
   Combine,
   FlipVertical2,
   Layers3,
@@ -20,10 +19,22 @@ export function ElementTransformPanel({
   const [rotate, setRotate] = useState<Values>({ x: 0, y: 0, z: 0 });
   const [scale, setScale] = useState<Values>({ x: 1, y: 1, z: 1 });
   const [extrudeDistance, setExtrudeDistance] = useState(1);
-  const resetModelingPreview = () => setExtrudeDistance(1);
+  const [showExtrudeDialog, setShowExtrudeDialog] = useState(false);
   const run = (action: () => void) => {
     try {
       action();
+    } catch (error) {
+      onError(error instanceof Error ? error.message : String(error));
+    }
+  };
+  const closeExtrudeDialog = () => {
+    setShowExtrudeDialog(false);
+    setExtrudeDistance(1);
+  };
+  const applyExtrusion = () => {
+    try {
+      editor.extrudeSelectedFaces(extrudeDistance);
+      closeExtrudeDialog();
     } catch (error) {
       onError(error instanceof Error ? error.message : String(error));
     }
@@ -83,25 +94,7 @@ export function ElementTransformPanel({
       </fieldset>
       <fieldset className="modeling-actions">
         <legend>モデリング</legend>
-        <label className="scalar-field">
-          <span>押し出し量</span>
-          <input
-            aria-label="押し出し量"
-            type="number"
-            step="0.1"
-            value={extrudeDistance}
-            onChange={(event) =>
-              setExtrudeDistance(Number(event.currentTarget.value))
-            }
-          />
-        </label>
-        <button
-          type="button"
-          onClick={() => {
-            run(() => editor.extrudeSelectedFaces(extrudeDistance));
-            resetModelingPreview();
-          }}
-        >
+        <button type="button" onClick={() => setShowExtrudeDialog(true)}>
           <Layers3 aria-hidden="true" />
           押し出し
         </button>
@@ -133,11 +126,49 @@ export function ElementTransformPanel({
           <FlipVertical2 aria-hidden="true" />
           面反転
         </button>
-        <button type="button" onClick={resetModelingPreview}>
-          <Ban aria-hidden="true" />
-          キャンセル
-        </button>
       </fieldset>
+      {showExtrudeDialog && (
+        <div className="dialog-backdrop" role="presentation">
+          <section
+            className="shortcut-dialog extrusion-dialog"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="extrusion-dialog-title"
+            onKeyDown={(event) => {
+              if (event.key === "Escape") closeExtrudeDialog();
+            }}
+          >
+            <header>
+              <h2 id="extrusion-dialog-title">面を押し出す</h2>
+            </header>
+            <p>選択中の面を法線方向へ押し出します。</p>
+            <label className="scalar-field extrusion-distance-field">
+              <span>押し出し量</span>
+              <input
+                autoFocus
+                aria-label="押し出し量"
+                type="number"
+                step="0.1"
+                value={extrudeDistance}
+                onChange={(event) =>
+                  setExtrudeDistance(Number(event.currentTarget.value))
+                }
+                onKeyDown={(event) => {
+                  if (event.key === "Enter") applyExtrusion();
+                }}
+              />
+            </label>
+            <div className="dialog-actions">
+              <button type="button" onClick={closeExtrudeDialog}>
+                キャンセル
+              </button>
+              <button type="button" onClick={applyExtrusion}>
+                押し出す
+              </button>
+            </div>
+          </section>
+        </div>
+      )}
     </div>
   );
 }
