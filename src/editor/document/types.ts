@@ -38,6 +38,9 @@ export interface EditorSnapshot {
   readonly canUndo: boolean;
   readonly canRedo: boolean;
   readonly selectionMode: import("../selection/SelectionManager").SelectionMode;
+  readonly selectionModes: ReadonlySet<
+    import("../selection/SelectionManager").SelectionMode
+  >;
   readonly selectionItems: readonly import("../selection/SelectionManager").SelectionItem[];
   readonly isDirty: boolean;
 }

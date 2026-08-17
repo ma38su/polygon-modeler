@@ -22,10 +22,7 @@ import type {
   SelectionItem,
   SelectionMode,
 } from "../../editor/selection/SelectionManager";
-import {
-  DEFAULT_DISPLAY_LAYERS,
-  type DisplayLayers,
-} from "../displayLayers";
+import { DEFAULT_DISPLAY_LAYERS, type DisplayLayers } from "../displayLayers";
 
 const OVERLAY_NAME = "selection-overlay";
 const baseColor = new Color(0x6f7d91);
@@ -41,6 +38,7 @@ export class RenderGeometryAdapter {
     objects: readonly ModelObjectSnapshot[],
     selectedIds: ReadonlySet<ObjectId>,
     selectionMode: SelectionMode = "object",
+    selectionModes: ReadonlySet<SelectionMode> = new Set([selectionMode]),
     selectionItems: readonly SelectionItem[] = [],
     displayLayers: DisplayLayers = DEFAULT_DISPLAY_LAYERS,
   ): void {
@@ -78,20 +76,14 @@ export class RenderGeometryAdapter {
       );
       const material = mesh.material as MeshStandardMaterial;
       const objectSelected =
-        selectionMode === "object" && selectedIds.has(object.id);
+        selectionModes.has("object") && selectedIds.has(object.id);
       material.color.set(objectSelected ? 0x78a0ff : 0x9aa5b5);
       material.emissive.set(objectSelected ? 0x172a55 : 0x000000);
       material.transparent = !displayLayers.faces;
       material.opacity = displayLayers.faces ? 1 : 0;
       material.depthWrite = displayLayers.faces;
       material.colorWrite = displayLayers.faces;
-      this.#syncOverlay(
-        mesh,
-        object,
-        selectionMode,
-        selectionItems,
-        displayLayers,
-      );
+      this.#syncOverlay(mesh, object, selectionItems, displayLayers);
     }
   }
   dispose(): void {
@@ -135,7 +127,6 @@ export class RenderGeometryAdapter {
   #syncOverlay(
     mesh: Mesh,
     object: ModelObjectSnapshot,
-    mode: SelectionMode,
     items: readonly SelectionItem[],
     displayLayers: DisplayLayers,
   ): void {
@@ -153,16 +144,10 @@ export class RenderGeometryAdapter {
     overlay.name = OVERLAY_NAME;
     overlay.renderOrder = 4;
     if (displayLayers.vertices)
-      this.#addVertexOverlay(
-        overlay,
-        object,
-        selected,
-        mode === "vertex",
-      );
+      this.#addVertexOverlay(overlay, object, selected, true);
     if (displayLayers.edges)
-      this.#addEdgeOverlay(overlay, object, selected, mode === "edge");
-    if (displayLayers.faces && mode === "face")
-      this.#addFaceOverlay(overlay, object, selected);
+      this.#addEdgeOverlay(overlay, object, selected, true);
+    if (displayLayers.faces) this.#addFaceOverlay(overlay, object, selected);
     if (overlay.children.length === 0) return;
     mesh.add(overlay);
   }
@@ -291,11 +276,7 @@ export class RenderGeometryAdapter {
   }
   #disposeObject(object: import("three").Object3D): void {
     object.traverse((child) => {
-      if (!(
-        child instanceof Mesh ||
-        child instanceof LineSegments
-      ))
-        return;
+      if (!(child instanceof Mesh || child instanceof LineSegments)) return;
       child.geometry.dispose();
       const materials = Array.isArray(child.material)
         ? child.material

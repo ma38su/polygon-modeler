@@ -3,6 +3,9 @@ import {
   Color,
   GridHelper,
   HemisphereLight,
+  InstancedMesh,
+  LineSegments,
+  Matrix4,
   OrthographicCamera,
   Object3D,
   PerspectiveCamera,
@@ -78,8 +81,12 @@ export class Viewport {
   #selectedObjectId?: ObjectId;
   #transformBefore?: TransformValue;
   #objects: readonly ModelObjectSnapshot[] = [];
-  #selectionMode: SelectionMode = "object";
+  #selectionModes: ReadonlySet<SelectionMode> = new Set(["object"]);
   #selectionItems: readonly SelectionItem[] = [];
+  readonly #elementPreview = new Map<
+    ObjectId,
+    { positions: Float32Array; indices: readonly number[] }
+  >();
   #pickListener?: (item: SelectionItem | undefined, additive: boolean) => void;
   #pointerStart?: { x: number; y: number };
   #animationFrame?: number;
@@ -152,6 +159,7 @@ export class Viewport {
     objects: readonly ModelObjectSnapshot[],
     selectedIds: ReadonlySet<ObjectId>,
     selectionMode: SelectionMode,
+    selectionModes: ReadonlySet<SelectionMode>,
     selectionItems: readonly SelectionItem[],
     displayLayers: DisplayLayers,
   ): void {
@@ -159,20 +167,21 @@ export class Viewport {
       objects,
       selectedIds,
       selectionMode,
+      selectionModes,
       selectionItems,
       displayLayers,
     );
     this.#objects = objects;
-    this.#selectionMode = selectionMode;
+    this.#selectionModes = selectionModes;
     this.#selectionItems = selectionItems;
     this.#selectedObjectId = selectedIds.values().next().value;
     this.#attachSelectedObject();
   }
   setPicking(
-    mode: SelectionMode,
+    modes: ReadonlySet<SelectionMode>,
     listener: (item: SelectionItem | undefined, additive: boolean) => void,
   ): void {
-    this.#selectionMode = mode;
+    this.#selectionModes = modes;
     this.#pickListener = listener;
   }
 
@@ -272,14 +281,14 @@ export class Viewport {
       !this.#pickListener
     )
       return;
-    const item = this.#picker.pick(
+    const item = this.#picker.pickPrioritized(
       event.clientX,
       event.clientY,
       this.element.getBoundingClientRect(),
       this.#camera,
       this.#geometryAdapter,
       this.#objects,
-      this.#selectionMode,
+      this.#selectionModes,
     );
     this.#pickListener(item, event.shiftKey);
   };
@@ -295,6 +304,7 @@ export class Viewport {
       if (this.#controls) this.#controls.enabled = !event.value;
     });
     controls.addEventListener("mouseDown", this.#handleTransformStart);
+    controls.addEventListener("objectChange", this.#handleTransformPreview);
     controls.addEventListener("mouseUp", this.#handleTransformEnd);
     this.#transformControls = controls;
     this.#scene.add(controls.getHelper());
@@ -311,12 +321,12 @@ export class Viewport {
   #attachSelectedObject(): void {
     if (!this.#transformControls) return;
     const mesh =
-      this.#selectionMode === "object" && this.#selectedObjectId
+      this.#selectionModes.has("object") && this.#selectedObjectId
         ? this.#geometryAdapter.getMesh(this.#selectedObjectId)
         : undefined;
     if (mesh) this.#transformControls.attach(mesh);
     else if (
-      this.#selectionMode !== "object" &&
+      !this.#selectionModes.has("object") &&
       this.#transformMode === "translate" &&
       this.#selectionItems.length > 0
     ) {
@@ -340,6 +350,7 @@ export class Viewport {
         rotation: { x: 0, y: 0, z: 0 },
         scale: { x: 1, y: 1, z: 1 },
       };
+      this.#captureElementPreview();
       return;
     }
     const mesh = this.#selectedObjectId
@@ -359,6 +370,7 @@ export class Viewport {
         y: this.#elementPivot.position.y - before.y,
         z: this.#elementPivot.position.z - before.z,
       };
+      this.#restoreElementPreview();
       this.#elementPivot.position.set(before.x, before.y, before.z);
       this.#transformBefore = undefined;
       if (Math.hypot(delta.x, delta.y, delta.z) > Number.EPSILON)
@@ -376,6 +388,123 @@ export class Viewport {
     }
     this.#transformBefore = undefined;
   };
+
+  #captureElementPreview(): void {
+    this.#elementPreview.clear();
+    for (const object of this.#objects) {
+      const indices = [...this.#selectedVertexIndices(object)];
+      if (indices.length === 0) continue;
+      const mesh = this.#geometryAdapter.getMesh(object.id);
+      const position = mesh?.geometry.getAttribute("position");
+      if (position)
+        this.#elementPreview.set(object.id, {
+          positions: new Float32Array(position.array),
+          indices,
+        });
+    }
+  }
+
+  #handleTransformPreview = (): void => {
+    if (
+      this.#transformControls?.object !== this.#elementPivot ||
+      !this.#transformBefore ||
+      this.#elementPreview.size === 0
+    )
+      return;
+    const before = this.#transformBefore.position;
+    const worldDelta = new Vector3(
+      this.#elementPivot.position.x - before.x,
+      this.#elementPivot.position.y - before.y,
+      this.#elementPivot.position.z - before.z,
+    );
+    for (const object of this.#objects) {
+      const preview = this.#elementPreview.get(object.id);
+      const mesh = this.#geometryAdapter.getMesh(object.id);
+      if (!preview || !mesh) continue;
+      const localDelta = this.#worldDeltaToLocal(mesh, worldDelta);
+      const position = mesh.geometry.getAttribute("position");
+      for (const index of preview.indices)
+        position.setXYZ(
+          index,
+          preview.positions[index * 3]! + localDelta.x,
+          preview.positions[index * 3 + 1]! + localDelta.y,
+          preview.positions[index * 3 + 2]! + localDelta.z,
+        );
+      position.needsUpdate = true;
+      mesh.geometry.computeVertexNormals();
+      mesh.geometry.computeBoundingSphere();
+      this.#updatePreviewOverlays(object, preview, localDelta);
+    }
+  };
+
+  #restoreElementPreview(): void {
+    for (const [objectId, preview] of this.#elementPreview) {
+      const mesh = this.#geometryAdapter.getMesh(objectId);
+      if (!mesh) continue;
+      const position = mesh.geometry.getAttribute("position");
+      preview.positions.forEach(
+        (value, index) => (position.array[index] = value),
+      );
+      position.needsUpdate = true;
+      mesh.geometry.computeVertexNormals();
+      mesh.geometry.computeBoundingSphere();
+      const object = this.#objects.find(
+        (candidate) => candidate.id === objectId,
+      );
+      if (object) this.#updatePreviewOverlays(object, preview, new Vector3());
+    }
+    this.#elementPreview.clear();
+  }
+
+  #worldDeltaToLocal(mesh: import("three").Mesh, delta: Vector3): Vector3 {
+    mesh.updateWorldMatrix(true, false);
+    const origin = mesh.getWorldPosition(new Vector3());
+    const localOrigin = mesh.worldToLocal(origin.clone());
+    const localEnd = mesh.worldToLocal(origin.add(delta));
+    return localEnd.sub(localOrigin);
+  }
+
+  #updatePreviewOverlays(
+    object: ModelObjectSnapshot,
+    preview: { positions: Float32Array; indices: readonly number[] },
+    delta: Vector3,
+  ): void {
+    const overlay = this.#geometryAdapter.getOverlay(object.id);
+    if (!overlay) return;
+    const selected = new Set(preview.indices);
+    const vertices = overlay.getObjectByName("vertex-overlay");
+    if (vertices instanceof InstancedMesh) {
+      const matrix = new Matrix4();
+      for (const index of preview.indices) {
+        matrix.makeTranslation(
+          preview.positions[index * 3]! + delta.x,
+          preview.positions[index * 3 + 1]! + delta.y,
+          preview.positions[index * 3 + 2]! + delta.z,
+        );
+        vertices.setMatrixAt(index, matrix);
+      }
+      vertices.instanceMatrix.needsUpdate = true;
+    }
+    const edges = overlay.getObjectByName("edge-overlay");
+    if (edges instanceof LineSegments) {
+      const position = edges.geometry.getAttribute("position");
+      object.mesh.edges.forEach((edge, edgeIndex) => {
+        edge.vertices.forEach((vertexIndex, endpointIndex) => {
+          if (!selected.has(vertexIndex)) return;
+          position.setXYZ(
+            edgeIndex * 2 + endpointIndex,
+            preview.positions[vertexIndex * 3]! + delta.x,
+            preview.positions[vertexIndex * 3 + 1]! + delta.y,
+            preview.positions[vertexIndex * 3 + 2]! + delta.z,
+          );
+        });
+      });
+      position.needsUpdate = true;
+      edges.geometry.computeBoundingSphere();
+    }
+    for (const name of ["vertex-selection-overlay", "face-selection-overlay"])
+      overlay.getObjectByName(name)?.position.copy(delta);
+  }
 
   #selectionPivotWorld(): Vector3 | undefined {
     const points: Vector3[] = [];
@@ -403,21 +532,18 @@ export class Viewport {
         .filter((item) => item.objectId === object.id)
         .map((item) => item.elementId),
     );
-    if (this.#selectionMode === "vertex")
-      object.mesh.vertexIds.forEach((id, index) => {
-        if (selected.has(id)) result.add(index);
-      });
-    else if (this.#selectionMode === "edge")
-      object.mesh.edges.forEach((edge) => {
-        if (!selected.has(edge.id)) return;
-        result.add(edge.vertices[0]);
-        result.add(edge.vertices[1]);
-      });
-    else if (this.#selectionMode === "face")
-      object.mesh.faceIds.forEach((id, index) => {
-        if (!selected.has(id)) return;
-        object.mesh.faces[index]?.forEach((vertex) => result.add(vertex));
-      });
+    object.mesh.vertexIds.forEach((id, index) => {
+      if (selected.has(id)) result.add(index);
+    });
+    object.mesh.edges.forEach((edge) => {
+      if (!selected.has(edge.id)) return;
+      result.add(edge.vertices[0]);
+      result.add(edge.vertices[1]);
+    });
+    object.mesh.faceIds.forEach((id, index) => {
+      if (!selected.has(id)) return;
+      object.mesh.faces[index]?.forEach((vertex) => result.add(vertex));
+    });
     return result;
   }
 

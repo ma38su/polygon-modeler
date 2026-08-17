@@ -34,7 +34,9 @@ export function useEditorShortcuts(
           "3": "edge",
           "4": "face",
         } as const;
-        editor.setSelectionMode(modes[event.key as keyof typeof modes]);
+        const mode = modes[event.key as keyof typeof modes];
+        if (mode === "object") editor.setSelectionMode(mode);
+        else editor.toggleSelectionMode(mode);
       } else if (event.key.toLowerCase() === "g") {
         setTransformMode("translate");
       } else if (event.key.toLowerCase() === "r") {

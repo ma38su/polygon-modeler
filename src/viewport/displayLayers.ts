@@ -5,7 +5,7 @@ export interface DisplayLayers {
 }
 
 export const DEFAULT_DISPLAY_LAYERS: Readonly<DisplayLayers> = {
-  vertices: false,
-  edges: false,
+  vertices: true,
+  edges: true,
   faces: true,
 };

@@ -9,6 +9,24 @@ import type { RenderGeometryAdapter } from "../adapters/RenderGeometryAdapter";
 export class CpuPicker {
   readonly #raycaster = new Raycaster();
   static readonly vertexRadiusPx = 4;
+  pickPrioritized(
+    x: number,
+    y: number,
+    bounds: DOMRect,
+    camera: Camera,
+    adapter: RenderGeometryAdapter,
+    objects: readonly ModelObjectSnapshot[],
+    modes: ReadonlySet<SelectionMode>,
+  ): SelectionItem | undefined {
+    if (modes.has("object"))
+      return this.pick(x, y, bounds, camera, adapter, objects, "object");
+    for (const mode of ["vertex", "edge", "face"] as const) {
+      if (!modes.has(mode)) continue;
+      const item = this.pick(x, y, bounds, camera, adapter, objects, mode);
+      if (item) return item;
+    }
+    return undefined;
+  }
   pick(
     x: number,
     y: number,
@@ -100,7 +118,8 @@ export class CpuPicker {
           (distance > bestDistance + 0.01 ||
             (Math.abs(distance - bestDistance) <= 0.01 &&
               projected.z >= bestDepth))
-        ) return;
+        )
+          return;
         bestDistance = distance;
         bestDepth = projected.z;
         result = { objectId: object.id, elementId };

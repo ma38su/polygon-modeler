@@ -20,8 +20,11 @@ export interface ViewportCanvasProps {
   selectedObjectIds: ReadonlySet<ObjectId>;
   transformMode: TransformMode;
   onTransformCommit: TransformCommitListener;
-  onElementTranslateCommit(delta: import("../editor/document/types").Vector3Value): void;
+  onElementTranslateCommit(
+    delta: import("../editor/document/types").Vector3Value,
+  ): void;
   selectionMode: SelectionMode;
+  selectionModes: ReadonlySet<SelectionMode>;
   selectionItems: readonly SelectionItem[];
   displayLayers: DisplayLayers;
   onPick(item: SelectionItem | undefined, additive: boolean): void;
@@ -36,6 +39,7 @@ export function ViewportCanvas({
   onTransformCommit,
   onElementTranslateCommit,
   selectionMode,
+  selectionModes,
   selectionItems,
   displayLayers,
   onPick,
@@ -68,14 +72,22 @@ export function ViewportCanvas({
         objects,
         selectedObjectIds,
         selectionMode,
+        selectionModes,
         selectionItems,
         displayLayers,
       ),
-    [displayLayers, objects, selectedObjectIds, selectionItems, selectionMode],
+    [
+      displayLayers,
+      objects,
+      selectedObjectIds,
+      selectionItems,
+      selectionMode,
+      selectionModes,
+    ],
   );
   useEffect(
-    () => viewportRef.current?.setPicking(selectionMode, onPick),
-    [selectionMode, onPick],
+    () => viewportRef.current?.setPicking(selectionModes, onPick),
+    [selectionModes, onPick],
   );
   useEffect(
     () => viewportRef.current?.setTransformMode(transformMode),
@@ -88,6 +100,7 @@ export function ViewportCanvas({
       ref={hostRef}
       data-testid="viewport-canvas"
       data-selection-mode={selectionMode}
+      data-selection-modes={[...selectionModes].join(",")}
       data-display-vertices={displayLayers.vertices}
       data-display-edges={displayLayers.edges}
       data-display-faces={displayLayers.faces}

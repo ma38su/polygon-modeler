@@ -136,6 +136,11 @@ export class Editor {
     this.#selectedObjectIds.clear();
     this.#commit();
   }
+  toggleSelectionMode(mode: Exclude<SelectionMode, "object">): void {
+    this.selection.toggleMode(mode);
+    this.#selectedObjectIds.clear();
+    this.#commit();
+  }
   selectElement(item?: SelectionItem, additive = false): void {
     if (additive && item) this.selection.toggle(item);
     else this.selection.replace(item);
@@ -152,17 +157,17 @@ export class Editor {
   selectAll(): void {
     const items: SelectionItem[] = [];
     for (const object of this.document.toSnapshot()) {
-      if (this.selection.mode === "object")
+      if (this.selection.modes.has("object"))
         items.push({ objectId: object.id, elementId: object.id });
-      else if (this.selection.mode === "vertex")
+      if (this.selection.modes.has("vertex"))
         object.mesh.vertexIds.forEach((id) =>
           items.push({ objectId: object.id, elementId: id }),
         );
-      else if (this.selection.mode === "edge")
+      if (this.selection.modes.has("edge"))
         object.mesh.edges.forEach((edge) =>
           items.push({ objectId: object.id, elementId: edge.id }),
         );
-      else
+      if (this.selection.modes.has("face"))
         object.mesh.faceIds.forEach((id) =>
           items.push({ objectId: object.id, elementId: id }),
         );
@@ -272,7 +277,7 @@ export class Editor {
     });
   }
   deleteSelectedElements(): void {
-    if (this.selection.mode === "object") {
+    if (this.selection.modes.has("object")) {
       this.deleteSelectedObjects();
       return;
     }
@@ -283,15 +288,18 @@ export class Editor {
       const object = this.document.getObject(objectId);
       if (!object) continue;
       const after = object.mesh.clone();
-      for (const item of this.selection.items.filter(
+      const items = this.selection.items.filter(
         (candidate) => candidate.objectId === objectId,
-      )) {
-        if (this.selection.mode === "vertex")
-          after.deleteVertex(item.elementId as VertexId);
-        else if (this.selection.mode === "edge")
-          after.deleteEdge(item.elementId as EdgeId);
-        else after.deleteFace(item.elementId as FaceId);
-      }
+      );
+      items
+        .filter((item) => object.mesh.faces.has(item.elementId as FaceId))
+        .forEach((item) => after.deleteFace(item.elementId as FaceId));
+      items
+        .filter((item) => object.mesh.edges.has(item.elementId as EdgeId))
+        .forEach((item) => after.deleteEdge(item.elementId as EdgeId));
+      items
+        .filter((item) => object.mesh.vertices.has(item.elementId as VertexId))
+        .forEach((item) => after.deleteVertex(item.elementId as VertexId));
       commands.push(
         new EditMeshCommand("要素を削除", objectId, object.mesh, after),
       );
@@ -310,50 +318,63 @@ export class Editor {
     }
   }
   extrudeSelectedFaces(distance: number): void {
-    if (this.selection.mode !== "face") return;
     this.#applyTopology("面を押し出し", (mesh, items) =>
       extrudeFaces(
         mesh,
-        new Set(items.map((item) => item.elementId as FaceId)),
+        new Set(
+          items
+            .map((item) => item.elementId as FaceId)
+            .filter((id) => mesh.faces.has(id)),
+        ),
         distance,
       ),
     );
   }
   splitSelectedElements(): void {
-    if (this.selection.mode !== "face" && this.selection.mode !== "edge")
-      return;
     this.#applyTopology("要素を分割", (mesh, items) => {
-      const first = items[0];
-      if (!first) return mesh.clone();
-      return this.selection.mode === "face"
-        ? splitFace(mesh, first.elementId as FaceId)
-        : splitEdge(mesh, first.elementId as EdgeId);
+      const face = items.find((item) =>
+        mesh.faces.has(item.elementId as FaceId),
+      );
+      if (face) return splitFace(mesh, face.elementId as FaceId);
+      const edge = items.find((item) =>
+        mesh.edges.has(item.elementId as EdgeId),
+      );
+      return edge ? splitEdge(mesh, edge.elementId as EdgeId) : mesh.clone();
     });
   }
   flipSelectedFaces(): void {
-    if (this.selection.mode !== "face") return;
     this.#applyTopology("面を反転", (mesh, items) =>
-      flipFaces(mesh, new Set(items.map((item) => item.elementId as FaceId))),
+      flipFaces(
+        mesh,
+        new Set(
+          items
+            .map((item) => item.elementId as FaceId)
+            .filter((id) => mesh.faces.has(id)),
+        ),
+      ),
     );
   }
   mergeSelectedVertices(): void {
-    if (this.selection.mode !== "vertex") return;
-    this.#applyTopology("頂点を結合", (mesh, items) =>
-      items.length >= 2
+    this.#applyTopology("頂点を結合", (mesh, items) => {
+      const vertices = items.filter((item) =>
+        mesh.vertices.has(item.elementId as VertexId),
+      );
+      return vertices.length >= 2
         ? mergeVertices(
             mesh,
-            items[0]!.elementId as VertexId,
-            items[1]!.elementId as VertexId,
+            vertices[0]!.elementId as VertexId,
+            vertices[1]!.elementId as VertexId,
           )
-        : mesh.clone(),
-    );
+        : mesh.clone();
+    });
   }
   createFaceFromSelection(): void {
-    if (this.selection.mode !== "vertex") return;
     this.#applyTopology("面を生成", (mesh, items) =>
       createFace(
         mesh,
-        items.map((item) => item.elementId as VertexId),
+        items
+          .map((item) => item.elementId as VertexId)
+          .filter((id) => mesh.vertices.has(id)),
       ),
     );
   }
@@ -443,9 +464,9 @@ export class Editor {
     for (const item of this.selection.items.filter(
       (candidate) => candidate.objectId === objectId,
     )) {
-      if (this.selection.mode === "vertex")
+      if (object.mesh.vertices.has(item.elementId as VertexId))
         result.add(item.elementId as VertexId);
-      else if (this.selection.mode === "edge") {
+      else if (object.mesh.edges.has(item.elementId as EdgeId)) {
         const edge = object.mesh.edges.get(item.elementId as EdgeId);
         if (edge)
           for (const halfEdgeId of edge.halfEdges) {
@@ -453,7 +474,7 @@ export class Editor {
             result.add(halfEdge.origin);
             result.add(halfEdge.destination);
           }
-      } else if (this.selection.mode === "face") {
+      } else if (object.mesh.faces.has(item.elementId as FaceId)) {
         const face = object.mesh.faces.get(item.elementId as FaceId);
         if (face) for (const id of face.vertices) result.add(id);
       }
@@ -527,6 +548,7 @@ export class Editor {
       canUndo: this.history.canUndo,
       canRedo: this.history.canRedo,
       selectionMode: this.selection.mode,
+      selectionModes: this.selection.modes,
       selectionItems: this.selection.items,
       isDirty: this.#isDirty,
     };

@@ -274,19 +274,23 @@ export default function App() {
               <button
                 type="button"
                 key={mode}
-                className={snapshot.selectionMode === mode ? "active" : ""}
-                aria-pressed={snapshot.selectionMode === mode}
+                className={snapshot.selectionModes.has(mode) ? "active" : ""}
+                aria-pressed={snapshot.selectionModes.has(mode)}
                 title={description}
-                onClick={() => editor.setSelectionMode(mode)}
+                onClick={() =>
+                  mode === "object"
+                    ? editor.setSelectionMode(mode)
+                    : editor.toggleSelectionMode(mode)
+                }
               >
                 {label}
               </button>
             ))}
           </div>
           <div className="selection-mode-hint" aria-live="polite">
-            {snapshot.selectionMode === "object"
+            {snapshot.selectionModes.has("object")
               ? "Object: オブジェクト全体"
-              : `${snapshot.selectionMode}: Shift+クリックで複数選択`}
+              : "Vertex → Edge → Faceの順に判定 / Shiftで追加選択"}
           </div>
           <div className="display-layer-bar" aria-label="表示レイヤー">
             <span>表示</span>
@@ -346,6 +350,7 @@ export default function App() {
             onTransformCommit={handleTransformCommit}
             onElementTranslateCommit={handleElementTranslateCommit}
             selectionMode={snapshot.selectionMode}
+            selectionModes={snapshot.selectionModes}
             selectionItems={snapshot.selectionItems}
             displayLayers={displayLayers}
             onPick={handlePick}
@@ -460,7 +465,7 @@ export default function App() {
           </section>
           <section aria-labelledby="inspector-title">
             <h2 id="inspector-title">インスペクター</h2>
-            {snapshot.selectionMode !== "object" &&
+            {!snapshot.selectionModes.has("object") &&
             snapshot.selectionItems.length ? (
               <ElementTransformPanel
                 editor={editor}
@@ -477,7 +482,9 @@ export default function App() {
 
       <footer className="status-bar">
         <span>ツール: {transformMode}</span>
-        <span>モード: {snapshot.selectionMode}</span>
+        <span>
+          モード: {[...snapshot.selectionModes].join("+") || "選択OFF"}
+        </span>
         <span>選択: {snapshot.selectionItems.length}</span>
         <span>
           頂点:{" "}

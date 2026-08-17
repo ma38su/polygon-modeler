@@ -81,10 +81,7 @@ describe("Editor", () => {
     editor.setSelectionMode("face");
     const mesh = editor.getSnapshot().objects[0]!.mesh;
     editor.selectElement({ objectId, elementId: mesh.faceIds[0]! });
-    editor.selectElement(
-      { objectId, elementId: mesh.faceIds[1]! },
-      true,
-    );
+    editor.selectElement({ objectId, elementId: mesh.faceIds[1]! }, true);
     editor.translateSelected({ x: 1, y: 0, z: 0 });
     expect(editor.getSnapshot().objects[0]!.mesh.positions).not.toEqual(
       mesh.positions,
@@ -93,6 +90,23 @@ describe("Editor", () => {
     expect(editor.getSnapshot().objects[0]!.mesh.positions).toEqual(
       mesh.positions,
     );
+  });
+  it("moves mixed vertex and edge selections without double transforms", () => {
+    const editor = new Editor();
+    const objectId = editor.createBox();
+    editor.toggleSelectionMode("vertex");
+    editor.toggleSelectionMode("edge");
+    const mesh = editor.getSnapshot().objects[0]!.mesh;
+    const edge = mesh.edges[0]!;
+    const sharedVertex = edge.vertices[0];
+    editor.selectElement({
+      objectId,
+      elementId: mesh.vertexIds[sharedVertex]!,
+    });
+    editor.selectElement({ objectId, elementId: edge.id }, true);
+    editor.translateSelected({ x: 1, y: 0, z: 0 });
+    const moved = editor.getSnapshot().objects[0]!.mesh.positions;
+    expect(moved[sharedVertex * 3]).toBe(mesh.positions[sharedVertex * 3]! + 1);
   });
   it("converts gizmo movement from world space into object-local space", () => {
     const editor = new Editor();

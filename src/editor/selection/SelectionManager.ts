@@ -6,22 +6,38 @@ export interface SelectionItem {
   readonly elementId: ElementId;
 }
 export interface SelectionSnapshot {
-  readonly mode: SelectionMode;
+  readonly modes: readonly SelectionMode[];
   readonly items: readonly SelectionItem[];
 }
 const keyOf = (item: SelectionItem) => `${item.objectId}:${item.elementId}`;
 export class SelectionManager {
-  #mode: SelectionMode = "object";
+  readonly #modes = new Set<SelectionMode>(["object"]);
   readonly #items = new Map<string, SelectionItem>();
   get mode() {
-    return this.#mode;
+    if (this.#modes.has("object")) return "object";
+    return (
+      (["vertex", "edge", "face"] as const).find((mode) =>
+        this.#modes.has(mode),
+      ) ?? "vertex"
+    );
+  }
+  get modes() {
+    return new Set(this.#modes);
   }
   get items() {
     return [...this.#items.values()];
   }
   setMode(mode: SelectionMode) {
-    if (mode === this.#mode) return false;
-    this.#mode = mode;
+    if (this.#modes.size === 1 && this.#modes.has(mode)) return false;
+    this.#modes.clear();
+    this.#modes.add(mode);
+    this.#items.clear();
+    return true;
+  }
+  toggleMode(mode: Exclude<SelectionMode, "object">) {
+    if (this.#modes.has("object")) this.#modes.clear();
+    if (this.#modes.has(mode)) this.#modes.delete(mode);
+    else this.#modes.add(mode);
     this.#items.clear();
     return true;
   }
@@ -49,10 +65,11 @@ export class SelectionManager {
     return this.#items.has(keyOf(item));
   }
   snapshot(): SelectionSnapshot {
-    return { mode: this.#mode, items: this.items };
+    return { modes: [...this.#modes], items: this.items };
   }
   restore(snapshot: SelectionSnapshot): void {
-    this.#mode = snapshot.mode;
+    this.#modes.clear();
+    for (const mode of snapshot.modes) this.#modes.add(mode);
     this.#items.clear();
     for (const item of snapshot.items) this.#items.set(keyOf(item), item);
   }

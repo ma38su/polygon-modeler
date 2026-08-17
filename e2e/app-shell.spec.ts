@@ -47,17 +47,20 @@ test("shows the empty editor shell", async ({ page }) => {
   const displayLayers = page.getByLabel("表示レイヤー");
   await expect(
     displayLayers.getByRole("button", { name: "Vertex" }),
-  ).toHaveAttribute("aria-pressed", "false");
+  ).toHaveAttribute("aria-pressed", "true");
+  await expect(
+    displayLayers.getByRole("button", { name: "Edge" }),
+  ).toHaveAttribute("aria-pressed", "true");
   await displayLayers.getByRole("button", { name: "Vertex" }).click();
   await expect(page.getByTestId("viewport-canvas")).toHaveAttribute(
     "data-display-vertices",
-    "true",
+    "false",
   );
   await expect(page.getByTestId("viewport-canvas")).toHaveAttribute(
     "data-selection-mode",
     "object",
   );
-  await displayLayers.getByRole("button", { name: "Edge" }).click();
+  await displayLayers.getByRole("button", { name: "Vertex" }).click();
   await displayLayers.getByRole("button", { name: "Face" }).click();
   await expect(page.getByTestId("viewport-canvas")).toHaveAttribute(
     "data-display-edges",
@@ -75,7 +78,7 @@ test("shows the empty editor shell", async ({ page }) => {
     "vertex",
   );
   await expect(
-    page.getByText("vertex: Shift+クリックで複数選択"),
+    page.getByText("Vertex → Edge → Faceの順に判定 / Shiftで追加選択"),
   ).toBeVisible();
   await page.keyboard.press("ControlOrMeta+A");
   await expect(page.getByText("選択: 8")).toBeVisible();
@@ -83,11 +86,13 @@ test("shows the empty editor shell", async ({ page }) => {
   await expect(page.getByText("選択: 0")).toBeVisible();
   await selectionModes.getByRole("button", { name: "Edge" }).click();
   await expect(page.getByTestId("viewport-canvas")).toHaveAttribute(
-    "data-selection-mode",
-    "edge",
+    "data-selection-modes",
+    "vertex,edge",
   );
   await page.keyboard.press("ControlOrMeta+A");
-  await expect(page.getByText("選択: 12")).toBeVisible();
+  await expect(page.getByText("選択: 20")).toBeVisible();
+  await selectionModes.getByRole("button", { name: "Vertex" }).click();
+  await selectionModes.getByRole("button", { name: "Edge" }).click();
   await selectionModes.getByRole("button", { name: "Face" }).click();
   await page.keyboard.press("ControlOrMeta+A");
   await page.keyboard.press("Delete");

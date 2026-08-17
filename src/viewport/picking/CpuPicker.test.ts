@@ -17,7 +17,7 @@ describe("CpuPicker vertex hit area", () => {
       createBoxMesh(),
     ).toSnapshot();
     const adapter = new RenderGeometryAdapter();
-    adapter.sync([object], new Set(), "vertex", [], {
+    adapter.sync([object], new Set(), "vertex", new Set(["vertex"]), [], {
       vertices: true,
       edges: false,
       faces: false,
@@ -47,6 +47,62 @@ describe("CpuPicker vertex hit area", () => {
     ).toBeUndefined();
     adapter.dispose();
   });
+  it("stops at the first hit in vertex, edge, face priority order", () => {
+    const object = new ModelObject(
+      objectId,
+      "Box",
+      createBoxMesh(),
+    ).toSnapshot();
+    const adapter = new RenderGeometryAdapter();
+    adapter.sync(
+      [object],
+      new Set(),
+      "vertex",
+      new Set(["vertex", "edge", "face"]),
+      [],
+      { vertices: true, edges: true, faces: true },
+    );
+    const camera = new PerspectiveCamera(45, 1, 0.01, 100);
+    camera.position.set(0, 0, 5);
+    camera.lookAt(0, 0, 0);
+    camera.updateMatrixWorld();
+    const bounds = {
+      left: 0,
+      top: 0,
+      width: 500,
+      height: 500,
+    } as DOMRect;
+    const vertex = new Vector3()
+      .fromArray(object.mesh.positions, 0)
+      .project(camera);
+    const x = ((vertex.x + 1) * bounds.width) / 2;
+    const y = ((1 - vertex.y) * bounds.height) / 2;
+    const picker = new CpuPicker();
+
+    expect(
+      picker.pickPrioritized(
+        x,
+        y,
+        bounds,
+        camera,
+        adapter,
+        [object],
+        new Set(["vertex", "edge", "face"]),
+      )?.elementId,
+    ).toBe(object.mesh.vertexIds[0]);
+    expect(object.mesh.edges.map((edge) => edge.id)).toContain(
+      picker.pickPrioritized(
+        x,
+        y,
+        bounds,
+        camera,
+        adapter,
+        [object],
+        new Set(["edge", "face"]),
+      )?.elementId,
+    );
+    adapter.dispose();
+  });
 });
 
 describe("CpuPicker face picking", () => {
@@ -64,7 +120,7 @@ describe("CpuPicker face picking", () => {
       new Vector3().subVectors(b!, a!).cross(new Vector3().subVectors(c!, a!))
         .y,
     ).toBeGreaterThan(0);
-    adapter.sync([object], new Set(), "face", [], {
+    adapter.sync([object], new Set(), "face", new Set(["face"]), [], {
       vertices: false,
       edges: false,
       faces: true,
@@ -83,15 +139,8 @@ describe("CpuPicker face picking", () => {
     } as DOMRect;
 
     expect(
-      new CpuPicker().pick(
-        250,
-        250,
-        bounds,
-        camera,
-        adapter,
-        [object],
-        "face",
-      )?.elementId,
+      new CpuPicker().pick(250, 250, bounds, camera, adapter, [object], "face")
+        ?.elementId,
     ).toBe(object.mesh.faceIds[0]);
     adapter.dispose();
   });
