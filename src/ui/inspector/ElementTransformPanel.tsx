@@ -4,6 +4,7 @@ import type { ModelObjectSnapshot } from "../../editor/document/types";
 import {
   Combine,
   BetweenHorizontalEnd,
+  ArrowUpFromLine,
   Component,
   FlipVertical2,
   Layers3,
@@ -17,7 +18,7 @@ import {
   Ungroup,
 } from "lucide-react";
 type Values = { x: number; y: number; z: number };
-type ModelingOperation = "extrude" | "inset" | "bevel";
+type ModelingOperation = "extrude" | "inset" | "bevel" | "normalMove";
 type ModelingOperationConfig = {
   title: string;
   description: string;
@@ -58,6 +59,14 @@ const modelingOperations: Record<ModelingOperation, ModelingOperationConfig> = {
     min: 0.01,
     max: 0.49,
   },
+  normalMove: {
+    title: "法線方向へ移動",
+    description: "選択中の面、または辺を平均法線方向へ移動します。",
+    label: "移動量",
+    confirm: "移動",
+    defaultValue: 0.25,
+    step: 0.05,
+  },
 };
 export function ElementTransformPanel({
   editor,
@@ -92,7 +101,9 @@ export function ElementTransformPanel({
           ? editor.previewExtrudeSelectedFaces(value)
           : operation === "inset"
             ? editor.previewInsetSelectedFaces(value)
-            : editor.previewBevelSelectedElements(value),
+            : operation === "bevel"
+              ? editor.previewBevelSelectedElements(value)
+              : editor.previewMoveSelectedAlongNormals(value),
       );
     } catch (error) {
       onPreview(undefined);
@@ -113,7 +124,9 @@ export function ElementTransformPanel({
         editor.extrudeSelectedFaces(modelingValue);
       else if (modelingOperation === "inset")
         editor.insetSelectedFaces(modelingValue);
-      else editor.bevelSelectedElements(modelingValue);
+      else if (modelingOperation === "bevel")
+        editor.bevelSelectedElements(modelingValue);
+      else editor.moveSelectedAlongNormals(modelingValue);
       closeModelingDialog();
     } catch (error) {
       onError(error instanceof Error ? error.message : String(error));
@@ -247,6 +260,10 @@ export function ElementTransformPanel({
         <button type="button" onClick={() => openModelingDialog("bevel")}>
           <Slice aria-hidden="true" />
           ベベル
+        </button>
+        <button type="button" onClick={() => openModelingDialog("normalMove")}>
+          <ArrowUpFromLine aria-hidden="true" />
+          法線移動
         </button>
         <button
           type="button"

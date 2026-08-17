@@ -49,6 +49,7 @@ import {
 import { deserializeProject, serializeProject } from "./formats/projectFormat";
 import type { ImportedMesh } from "./formats/exchangeFormats";
 import { extractFaces, joinObjectMeshes } from "./mesh/objectOperations";
+import { moveElementsAlongNormals } from "./mesh/normalMovement";
 type Listener = () => void;
 export class Editor {
   readonly document = new ModelDocument();
@@ -630,6 +631,44 @@ export class Editor {
       ),
     );
   }
+  moveSelectedAlongNormals(distance: number): void {
+    this.#applySelectionMesh("法線方向へ移動", (mesh, items) =>
+      moveElementsAlongNormals(
+        mesh,
+        new Set(
+          items
+            .map((item) => item.elementId as FaceId)
+            .filter((id) => mesh.faces.has(id)),
+        ),
+        new Set(
+          items
+            .map((item) => item.elementId as EdgeId)
+            .filter((id) => mesh.edges.has(id)),
+        ),
+        distance,
+      ),
+    );
+  }
+  previewMoveSelectedAlongNormals(
+    distance: number,
+  ): readonly ModelObjectSnapshot[] {
+    return this.#previewTopology((mesh, items) =>
+      moveElementsAlongNormals(
+        mesh,
+        new Set(
+          items
+            .map((item) => item.elementId as FaceId)
+            .filter((id) => mesh.faces.has(id)),
+        ),
+        new Set(
+          items
+            .map((item) => item.elementId as EdgeId)
+            .filter((id) => mesh.edges.has(id)),
+        ),
+        distance,
+      ),
+    );
+  }
   flipSelectedFaces(): void {
     this.#applyTopology("面を反転", (mesh, items) =>
       flipFaces(
@@ -692,6 +731,26 @@ export class Editor {
       before,
       after: this.selection.snapshot(),
     });
+    this.#commit(true);
+  }
+  #applySelectionMesh(
+    label: string,
+    operation: (
+      mesh: EditableMesh,
+      items: readonly SelectionItem[],
+    ) => EditableMesh,
+  ): void {
+    const commands: EditMeshCommand[] = [];
+    for (const [objectId, items] of this.#selectionGroups()) {
+      const object = this.document.getObject(objectId);
+      if (!object) continue;
+      const after = operation(object.mesh, items);
+      const validation = validateMesh(after);
+      if (!validation.valid) throw new Error(validation.errors.join("\n"));
+      commands.push(new EditMeshCommand(label, objectId, object.mesh, after));
+    }
+    if (!commands.length) return;
+    this.history.execute(new CompositeCommand(label, commands), this.document);
     this.#commit(true);
   }
   #previewTopology(

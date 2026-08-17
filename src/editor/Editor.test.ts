@@ -233,6 +233,20 @@ describe("Editor", () => {
     editor.undo();
     expect(editor.getSnapshot().objects[0]!.mesh.faces).toHaveLength(6);
   });
+  it("previews and commits face normal movement", () => {
+    const editor = new Editor();
+    const objectId = editor.createPlane();
+    editor.setSelectionMode("face");
+    const faceId = editor.getSnapshot().objects[0]!.mesh.faceIds[0]!;
+    editor.selectElement({ objectId, elementId: faceId });
+    const preview = editor.previewMoveSelectedAlongNormals(1);
+    expect(preview[0]!.mesh.positions[1]).toBe(1);
+    expect(editor.getSnapshot().objects[0]!.mesh.positions[1]).toBe(0);
+    editor.moveSelectedAlongNormals(1);
+    expect(editor.getSnapshot().objects[0]!.mesh.positions[1]).toBe(1);
+    editor.undo();
+    expect(editor.getSnapshot().objects[0]!.mesh.positions[1]).toBe(0);
+  });
   it("previews numeric transforms without changing document history", () => {
     const editor = new Editor();
     const objectId = editor.createBox();
