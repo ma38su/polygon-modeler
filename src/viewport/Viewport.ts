@@ -6,6 +6,7 @@ import {
   InstancedMesh,
   LineSegments,
   Matrix4,
+  Mesh,
   OrthographicCamera,
   Object3D,
   PerspectiveCamera,
@@ -53,7 +54,17 @@ export type TransformCommitListener = (
   before: TransformValue,
   after: TransformValue,
 ) => void;
-export type ElementTranslateCommitListener = (delta: Vector3Value) => void;
+export interface ElementTransformUpdate {
+  readonly objectId: ObjectId;
+  readonly vertices: readonly {
+    id: import("../editor/document/types").VertexId;
+    position: Vector3Value;
+  }[];
+}
+export type ElementTransformCommitListener = (
+  mode: TransformMode,
+  updates: readonly ElementTransformUpdate[],
+) => void;
 
 export class Viewport {
   readonly element: HTMLElement;
@@ -78,7 +89,7 @@ export class Viewport {
   #transformControls?: TransformControls;
   #transformMode: TransformMode = "translate";
   #transformCommitListener?: TransformCommitListener;
-  #elementTranslateCommitListener?: ElementTranslateCommitListener;
+  #elementTransformCommitListener?: ElementTransformCommitListener;
   #selectedObjectId?: ObjectId;
   #transformBefore?: TransformValue;
   #objects: readonly ModelObjectSnapshot[] = [];
@@ -193,10 +204,10 @@ export class Viewport {
     this.#transformCommitListener = listener;
   }
 
-  setElementTranslateCommitListener(
-    listener: ElementTranslateCommitListener,
+  setElementTransformCommitListener(
+    listener: ElementTransformCommitListener,
   ): void {
-    this.#elementTranslateCommitListener = listener;
+    this.#elementTransformCommitListener = listener;
   }
 
   dispose(): void {
@@ -323,14 +334,13 @@ export class Viewport {
         ? this.#geometryAdapter.getMesh(this.#selectedObjectId)
         : undefined;
     if (mesh) this.#transformControls.attach(mesh);
-    else if (
-      this.#transformMode === "translate" &&
-      this.#selectionItems.length > 0
-    ) {
+    else if (this.#selectionItems.length > 0) {
       const pivot = this.#selectionPivotWorld();
       if (!pivot) this.#transformControls.detach();
       else {
         this.#elementPivot.position.copy(pivot);
+        this.#elementPivot.rotation.set(0, 0, 0);
+        this.#elementPivot.scale.set(1, 1, 1);
         this.#transformControls.attach(this.#elementPivot);
       }
     } else this.#transformControls.detach();
@@ -361,17 +371,15 @@ export class Viewport {
       this.#transformControls?.object === this.#elementPivot &&
       this.#transformBefore
     ) {
-      const before = this.#transformBefore.position;
-      const delta = {
-        x: this.#elementPivot.position.x - before.x,
-        y: this.#elementPivot.position.y - before.y,
-        z: this.#elementPivot.position.z - before.z,
-      };
+      const updates = this.#elementTransformUpdates();
       this.#restoreElementPreview();
+      const before = this.#transformBefore.position;
       this.#elementPivot.position.set(before.x, before.y, before.z);
+      this.#elementPivot.rotation.set(0, 0, 0);
+      this.#elementPivot.scale.set(1, 1, 1);
       this.#transformBefore = undefined;
-      if (Math.hypot(delta.x, delta.y, delta.z) > Number.EPSILON)
-        this.#elementTranslateCommitListener?.(delta);
+      if (updates.length)
+        this.#elementTransformCommitListener?.(this.#transformMode, updates);
       return;
     }
     const id = this.#selectedObjectId;
@@ -408,29 +416,26 @@ export class Viewport {
       this.#elementPreview.size === 0
     )
       return;
-    const before = this.#transformBefore.position;
-    const worldDelta = new Vector3(
-      this.#elementPivot.position.x - before.x,
-      this.#elementPivot.position.y - before.y,
-      this.#elementPivot.position.z - before.z,
-    );
+    const worldTransform = this.#elementWorldTransform();
     for (const object of this.#objects) {
       const preview = this.#elementPreview.get(object.id);
       const mesh = this.#geometryAdapter.getMesh(object.id);
       if (!preview || !mesh) continue;
-      const localDelta = this.#worldDeltaToLocal(mesh, worldDelta);
+      mesh.updateWorldMatrix(true, false);
+      const worldToLocal = mesh.matrixWorld.clone().invert();
       const position = mesh.geometry.getAttribute("position");
-      for (const index of preview.indices)
-        position.setXYZ(
-          index,
-          preview.positions[index * 3]! + localDelta.x,
-          preview.positions[index * 3 + 1]! + localDelta.y,
-          preview.positions[index * 3 + 2]! + localDelta.z,
-        );
+      for (const index of preview.indices) {
+        const transformed = new Vector3()
+          .fromArray(preview.positions, index * 3)
+          .applyMatrix4(mesh.matrixWorld)
+          .applyMatrix4(worldTransform)
+          .applyMatrix4(worldToLocal);
+        position.setXYZ(index, transformed.x, transformed.y, transformed.z);
+      }
       position.needsUpdate = true;
       mesh.geometry.computeVertexNormals();
       mesh.geometry.computeBoundingSphere();
-      this.#updatePreviewOverlays(object, preview, localDelta);
+      this.#updatePreviewOverlays(object, preview, position.array);
     }
   };
 
@@ -448,23 +453,51 @@ export class Viewport {
       const object = this.#objects.find(
         (candidate) => candidate.id === objectId,
       );
-      if (object) this.#updatePreviewOverlays(object, preview, new Vector3());
+      if (object)
+        this.#updatePreviewOverlays(object, preview, preview.positions);
     }
     this.#elementPreview.clear();
   }
 
-  #worldDeltaToLocal(mesh: import("three").Mesh, delta: Vector3): Vector3 {
-    mesh.updateWorldMatrix(true, false);
-    const origin = mesh.getWorldPosition(new Vector3());
-    const localOrigin = mesh.worldToLocal(origin.clone());
-    const localEnd = mesh.worldToLocal(origin.add(delta));
-    return localEnd.sub(localOrigin);
+  #elementWorldTransform(): Matrix4 {
+    const before = this.#transformBefore!.position;
+    const initial = new Matrix4().makeTranslation(before.x, before.y, before.z);
+    this.#elementPivot.updateMatrix();
+    return this.#elementPivot.matrix.clone().multiply(initial.invert());
+  }
+
+  #elementTransformUpdates(): ElementTransformUpdate[] {
+    const updates: ElementTransformUpdate[] = [];
+    for (const object of this.#objects) {
+      const preview = this.#elementPreview.get(object.id);
+      const position = this.#geometryAdapter
+        .getMesh(object.id)
+        ?.geometry.getAttribute("position");
+      if (!preview || !position) continue;
+      const vertices = preview.indices.flatMap((index) => {
+        const next = {
+          x: position.getX(index),
+          y: position.getY(index),
+          z: position.getZ(index),
+        };
+        const offset = index * 3;
+        const changed =
+          Math.abs(next.x - preview.positions[offset]!) > Number.EPSILON ||
+          Math.abs(next.y - preview.positions[offset + 1]!) > Number.EPSILON ||
+          Math.abs(next.z - preview.positions[offset + 2]!) > Number.EPSILON;
+        return changed
+          ? [{ id: object.mesh.vertexIds[index]!, position: next }]
+          : [];
+      });
+      if (vertices.length) updates.push({ objectId: object.id, vertices });
+    }
+    return updates;
   }
 
   #updatePreviewOverlays(
     object: ModelObjectSnapshot,
     preview: { positions: Float32Array; indices: readonly number[] },
-    delta: Vector3,
+    positions: ArrayLike<number>,
   ): void {
     const overlay = this.#geometryAdapter.getOverlay(object.id);
     if (!overlay) return;
@@ -474,9 +507,9 @@ export class Viewport {
       const matrix = new Matrix4();
       for (const index of preview.indices) {
         matrix.makeTranslation(
-          preview.positions[index * 3]! + delta.x,
-          preview.positions[index * 3 + 1]! + delta.y,
-          preview.positions[index * 3 + 2]! + delta.z,
+          positions[index * 3]!,
+          positions[index * 3 + 1]!,
+          positions[index * 3 + 2]!,
         );
         vertices.setMatrixAt(index, matrix);
       }
@@ -490,17 +523,51 @@ export class Viewport {
           if (!selected.has(vertexIndex)) return;
           position.setXYZ(
             edgeIndex * 2 + endpointIndex,
-            preview.positions[vertexIndex * 3]! + delta.x,
-            preview.positions[vertexIndex * 3 + 1]! + delta.y,
-            preview.positions[vertexIndex * 3 + 2]! + delta.z,
+            positions[vertexIndex * 3]!,
+            positions[vertexIndex * 3 + 1]!,
+            positions[vertexIndex * 3 + 2]!,
           );
         });
       });
       position.needsUpdate = true;
       edges.geometry.computeBoundingSphere();
     }
-    for (const name of ["vertex-selection-overlay", "face-selection-overlay"])
-      overlay.getObjectByName(name)?.position.copy(delta);
+    const directlySelectedVertices = object.mesh.vertexIds.flatMap(
+      (id, index) =>
+        this.#selectionItems.some(
+          (item) => item.objectId === object.id && item.elementId === id,
+        )
+          ? [index]
+          : [],
+    );
+    const selectedVertices = overlay.getObjectByName(
+      "vertex-selection-overlay",
+    );
+    if (selectedVertices instanceof InstancedMesh) {
+      const matrix = new Matrix4();
+      directlySelectedVertices.forEach((index, instanceIndex) => {
+        matrix.makeTranslation(
+          positions[index * 3]!,
+          positions[index * 3 + 1]!,
+          positions[index * 3 + 2]!,
+        );
+        selectedVertices.setMatrixAt(instanceIndex, matrix);
+      });
+      selectedVertices.instanceMatrix.needsUpdate = true;
+    }
+    const selectedFaces = overlay.getObjectByName("face-selection-overlay");
+    if (selectedFaces instanceof Mesh) {
+      const position = selectedFaces.geometry.getAttribute("position");
+      for (let index = 0; index < position.count; index += 1)
+        position.setXYZ(
+          index,
+          positions[index * 3]!,
+          positions[index * 3 + 1]!,
+          positions[index * 3 + 2]!,
+        );
+      position.needsUpdate = true;
+      selectedFaces.geometry.computeBoundingSphere();
+    }
   }
 
   #selectionPivotWorld(): Vector3 | undefined {

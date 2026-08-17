@@ -120,6 +120,28 @@ describe("Editor", () => {
     const moved = editor.getSnapshot().objects[0]!.mesh.positions;
     expect(moved[sharedVertex * 3]).toBe(mesh.positions[sharedVertex * 3]! + 1);
   });
+  it("commits viewport element positions as one undoable transform", () => {
+    const editor = new Editor();
+    const objectId = editor.createBox();
+    editor.setSelectionMode("vertex");
+    const vertexId = editor.getSnapshot().objects[0]!.mesh.vertexIds[0]!;
+    editor.selectElement({ objectId, elementId: vertexId });
+
+    editor.applyElementTransform("要素を回転", [
+      {
+        objectId,
+        vertices: [{ id: vertexId, position: { x: 2, y: 3, z: 4 } }],
+      },
+    ]);
+
+    expect(editor.getSnapshot().objects[0]!.mesh.positions.slice(0, 3)).toEqual(
+      [2, 3, 4],
+    );
+    editor.undo();
+    expect(editor.getSnapshot().objects[0]!.mesh.positions.slice(0, 3)).toEqual(
+      [-1, -1, -1],
+    );
+  });
   it("converts gizmo movement from world space into object-local space", () => {
     const editor = new Editor();
     const objectId = editor.createBox();

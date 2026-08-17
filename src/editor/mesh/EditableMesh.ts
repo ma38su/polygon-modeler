@@ -145,6 +145,16 @@ export class EditableMesh {
     }
     this.#revision += 1;
   }
+  setVertexPositions(positions: ReadonlyMap<VertexId, Vector3Value>): void {
+    let changed = false;
+    for (const [id, position] of positions) {
+      const vertex = this.vertices.get(id);
+      if (!vertex) continue;
+      vertex.position = { ...position };
+      changed = true;
+    }
+    if (changed) this.#revision += 1;
+  }
   deleteEdge(id: EdgeId): void {
     const edge = this.edges.get(id);
     if (!edge) return;

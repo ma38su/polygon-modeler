@@ -209,6 +209,38 @@ export class Editor {
       };
     });
   }
+  applyElementTransform(
+    label: string,
+    updates: readonly {
+      objectId: ObjectId;
+      vertices: readonly { id: VertexId; position: Vector3Value }[];
+    }[],
+  ): void {
+    const commands: EditMeshCommand[] = [];
+    for (const update of updates) {
+      const object = this.document.getObject(update.objectId);
+      if (!object || update.vertices.length === 0) continue;
+      const selected = this.#selectedVertices(update.objectId);
+      const positions = new Map(
+        update.vertices
+          .filter((vertex) => selected.has(vertex.id))
+          .map((vertex) => [vertex.id, vertex.position] as const),
+      );
+      if (positions.size === 0) continue;
+      const after = object.mesh.clone();
+      after.setVertexPositions(positions);
+      commands.push(
+        new EditMeshCommand(label, update.objectId, object.mesh, after),
+      );
+    }
+    if (commands.length) {
+      this.history.execute(
+        new CompositeCommand(label, commands),
+        this.document,
+      );
+      this.#commit(true);
+    }
+  }
   #translateSelected(
     deltaForObject: (objectId: ObjectId) => Vector3Value,
   ): void {

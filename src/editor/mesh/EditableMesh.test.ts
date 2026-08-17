@@ -37,6 +37,20 @@ describe("EditableMesh", () => {
       createCylinderMesh(1, 2, 8).toMeshData(),
     );
   });
+  it("updates multiple vertex positions in one mesh revision", () => {
+    const mesh = createPlaneMesh();
+    const ids = [...mesh.vertices.keys()];
+    const revision = mesh.revision;
+    mesh.setVertexPositions(
+      new Map([
+        [ids[0]!, { x: 2, y: 3, z: 4 }],
+        [ids[1]!, { x: 5, y: 6, z: 7 }],
+      ]),
+    );
+    expect(mesh.vertices.get(ids[0]!)?.position).toEqual({ x: 2, y: 3, z: 4 });
+    expect(mesh.vertices.get(ids[1]!)?.position).toEqual({ x: 5, y: 6, z: 7 });
+    expect(mesh.revision).toBe(revision + 1);
+  });
   it("rejects non-manifold input", () => {
     expect(() => EditableMeshFromNonManifold()).toThrow("Non-manifold");
   });

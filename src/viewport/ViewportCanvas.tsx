@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { AlertTriangle, RefreshCw } from "lucide-react";
 import {
   Viewport,
+  type ElementTransformCommitListener,
   type TransformCommitListener,
   type TransformMode,
   type ViewportStatus,
@@ -20,9 +21,7 @@ export interface ViewportCanvasProps {
   selectedObjectIds: ReadonlySet<ObjectId>;
   transformMode: TransformMode;
   onTransformCommit: TransformCommitListener;
-  onElementTranslateCommit(
-    delta: import("../editor/document/types").Vector3Value,
-  ): void;
+  onElementTransformCommit: ElementTransformCommitListener;
   selectionModes: ReadonlySet<SelectionMode>;
   selectionItems: readonly SelectionItem[];
   displayLayers: DisplayLayers;
@@ -36,7 +35,7 @@ export function ViewportCanvas({
   selectedObjectIds,
   transformMode,
   onTransformCommit,
-  onElementTranslateCommit,
+  onElementTransformCommit,
   selectionModes,
   selectionItems,
   displayLayers,
@@ -55,13 +54,13 @@ export function ViewportCanvas({
     });
     viewportRef.current = viewport;
     viewport.setTransformCommitListener(onTransformCommit);
-    viewport.setElementTranslateCommitListener(onElementTranslateCommit);
+    viewport.setElementTransformCommitListener(onElementTransformCommit);
     void viewport.initialize();
     return () => {
       viewportRef.current = null;
       viewport.dispose();
     };
-  }, [onElementTranslateCommit, onStatusChange, onTransformCommit]);
+  }, [onElementTransformCommit, onStatusChange, onTransformCommit]);
 
   useEffect(() => viewportRef.current?.setProjection(projection), [projection]);
   useEffect(

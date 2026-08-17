@@ -94,9 +94,19 @@ export default function App() {
       editor.transformObject(...args),
     [editor],
   );
-  const handleElementTranslateCommit = useCallback(
-    (...args: Parameters<typeof editor.translateSelectedInWorld>) =>
-      editor.translateSelectedInWorld(...args),
+  const handleElementTransformCommit = useCallback(
+    (
+      mode: TransformMode,
+      updates: Parameters<typeof editor.applyElementTransform>[1],
+    ) =>
+      editor.applyElementTransform(
+        mode === "translate"
+          ? "要素を移動"
+          : mode === "rotate"
+            ? "要素を回転"
+            : "要素を拡大縮小",
+        updates,
+      ),
     [editor],
   );
   const handlePick = useCallback(
@@ -277,7 +287,7 @@ export default function App() {
             selectedObjectIds={snapshot.selectedObjectIds}
             transformMode={transformMode}
             onTransformCommit={handleTransformCommit}
-            onElementTranslateCommit={handleElementTranslateCommit}
+            onElementTransformCommit={handleElementTransformCommit}
             selectionModes={snapshot.selectionModes}
             selectionItems={snapshot.selectionItems}
             displayLayers={displayLayers}
