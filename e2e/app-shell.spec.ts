@@ -1,5 +1,18 @@
 import { expect, test } from "@playwright/test";
 
+test("renders the same editor contract on WebGPU when available", async ({
+  page,
+}) => {
+  await page.goto("/?renderer=webgpu");
+  const supported = await page.evaluate(() => "gpu" in navigator);
+  test.skip(!supported, "WebGPU is unavailable in this browser environment");
+  await expect(page.getByText("WebGPU 対応")).toBeVisible();
+  await page.getByRole("button", { name: "Plane追加" }).click();
+  await expect(page.getByText("頂点: 4")).toBeVisible();
+  await expect(page.getByText("面: 1")).toBeVisible();
+  await expect(page.getByTestId("viewport-canvas")).toBeVisible();
+});
+
 test("keeps header actions on one line at narrow window widths", async ({
   page,
 }) => {
