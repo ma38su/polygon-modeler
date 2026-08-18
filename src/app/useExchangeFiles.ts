@@ -17,13 +17,15 @@ export function useExchangeFiles(
   includeHidden: boolean,
   onError: (message: string) => void,
   importSettings: { unit: "meter" | "millimeter"; upAxis: "y" | "z" },
+  onSuccess?: (message: string) => void,
 ) {
   const inputRef = useRef<HTMLInputElement>(null);
   const abortRef = useRef<AbortController>(undefined);
   const [importProgress, setImportProgress] = useState<number>();
-  const run = async (action: () => Promise<void>) => {
+  const run = async (action: () => Promise<string | void>) => {
     try {
-      await action();
+      const message = await action();
+      if (message) onSuccess?.(message);
     } catch (error) {
       onError(error instanceof Error ? error.message : String(error));
     } finally {
@@ -41,6 +43,7 @@ export function useExchangeFiles(
           "model/gltf-binary",
           "polygon-model.glb",
         );
+        return "GLBを書き出しました。";
       }),
     exportStl: () =>
       void run(async () => {
@@ -50,6 +53,7 @@ export function useExchangeFiles(
           "model/stl",
           "polygon-model.stl",
         );
+        return "STLを書き出しました。";
       }),
     exportObj: () =>
       void run(async () => {
@@ -59,6 +63,7 @@ export function useExchangeFiles(
           "text/plain;charset=utf-8",
           "polygon-model.obj",
         );
+        return "OBJを書き出しました。";
       }),
     importFile: (event: ChangeEvent<HTMLInputElement>) => {
       const file = event.currentTarget.files?.[0];
@@ -82,7 +87,7 @@ export function useExchangeFiles(
           orientImported(imported, importSettings.upAxis);
           editor.importMeshes(imported);
           setImportProgress(undefined);
-          return;
+          return `${file.name}から${imported.length}個のオブジェクトを読み込みました。`;
         }
         const isGlb =
           data.byteLength >= 4 &&
@@ -93,6 +98,7 @@ export function useExchangeFiles(
         orientImported(imported, importSettings.upAxis);
         editor.importMeshes(imported);
         setImportProgress(undefined);
+        return `${file.name}から${imported.length}個のオブジェクトを読み込みました。`;
       });
     },
     importProgress,

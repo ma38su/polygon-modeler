@@ -6,6 +6,7 @@ import {
   BoxSelect,
   ChevronDown,
   CircleGauge,
+  CheckCircle2,
   FileDown,
   FolderOpen,
   HelpCircle,
@@ -86,12 +87,15 @@ export default function App() {
   const [knifeActive, setKnifeActive] = useState(false);
   const [knifeStart, setKnifeStart] = useState<KnifePoint>();
   const [showShortcuts, setShowShortcuts] = useState(false);
+  const [showImportDialog, setShowImportDialog] = useState(false);
+  const [exportFormat, setExportFormat] = useState<"glb" | "stl" | "obj">();
   const [includeHidden, setIncludeHidden] = useState(false);
   const [importSettings, setImportSettings] = useState<{
     unit: "meter" | "millimeter";
     upAxis: "y" | "z";
   }>({ unit: "meter", upAxis: "y" });
   const [errorMessage, setErrorMessage] = useState<string>();
+  const [successMessage, setSuccessMessage] = useState<string>();
   const [modelingPreview, setModelingPreview] =
     useState<readonly ModelObjectSnapshot[]>();
   const [geometryEpoch, setGeometryEpoch] = useState(0);
@@ -114,6 +118,11 @@ export default function App() {
     includeHidden,
     setErrorMessage,
     importSettings,
+    (message) => {
+      setSuccessMessage(message);
+      setShowImportDialog(false);
+      setExportFormat(undefined);
+    },
   );
   useEditorShortcuts(editor, {
     activateTransformMode,
@@ -128,6 +137,11 @@ export default function App() {
     const timer = window.setTimeout(() => setErrorMessage(undefined), 5000);
     return () => window.clearTimeout(timer);
   }, [errorMessage]);
+  useEffect(() => {
+    if (!successMessage) return;
+    const timer = window.setTimeout(() => setSuccessMessage(undefined), 5000);
+    return () => window.clearTimeout(timer);
+  }, [successMessage]);
   useEffect(() => {
     if (!normalOperation) return;
     const cancel = (event: KeyboardEvent) => {
@@ -287,21 +301,13 @@ export default function App() {
             <FolderOpen aria-hidden="true" />
             開く
           </button>
-          <button type="button" onClick={exchange.openPicker}>
+          <button type="button" onClick={() => setShowImportDialog(true)}>
             <Import aria-hidden="true" />
             3D読込
           </button>
-          <button type="button" onClick={exchange.exportGlb}>
+          <button type="button" onClick={() => setExportFormat("glb")}>
             <Upload aria-hidden="true" />
-            GLB出力
-          </button>
-          <button type="button" onClick={exchange.exportStl}>
-            <Upload aria-hidden="true" />
-            STL出力
-          </button>
-          <button type="button" onClick={exchange.exportObj}>
-            <Upload aria-hidden="true" />
-            OBJ出力
+            3D出力
           </button>
           <button type="button" onClick={openShortcutHelp}>
             表示
@@ -315,42 +321,6 @@ export default function App() {
             aria-label="プロジェクトファイルを開く"
             onChange={persistence.openFile}
           />
-          <label className="include-hidden">
-            単位
-            <select
-              aria-label="読み込み単位"
-              value={importSettings.unit}
-              onChange={(event) => {
-                const unit = event.currentTarget.value as
-                  | "meter"
-                  | "millimeter";
-                setImportSettings((current) => ({
-                  ...current,
-                  unit,
-                }));
-              }}
-            >
-              <option value="meter">m</option>
-              <option value="millimeter">mm</option>
-            </select>
-          </label>
-          <label className="include-hidden">
-            Up
-            <select
-              aria-label="読み込みUp軸"
-              value={importSettings.upAxis}
-              onChange={(event) => {
-                const upAxis = event.currentTarget.value as "y" | "z";
-                setImportSettings((current) => ({
-                  ...current,
-                  upAxis,
-                }));
-              }}
-            >
-              <option value="y">Y</option>
-              <option value="z">Z</option>
-            </select>
-          </label>
           <input
             ref={exchange.inputRef}
             className="visually-hidden"
@@ -361,24 +331,6 @@ export default function App() {
           />
         </nav>
         <div className="history-actions" aria-label="履歴操作">
-          {exchange.importProgress !== undefined && (
-            <div className="import-progress" role="status">
-              読込 {Math.round(exchange.importProgress * 100)}%
-              <button type="button" onClick={exchange.cancelImport}>
-                中止
-              </button>
-            </div>
-          )}
-          <label className="include-hidden">
-            <input
-              type="checkbox"
-              checked={includeHidden}
-              onChange={(event) =>
-                setIncludeHidden(event.currentTarget.checked)
-              }
-            />
-            非表示も出力
-          </label>
           <button type="button" onClick={openShortcutHelp}>
             <HelpCircle aria-hidden="true" />
             ショートカット
@@ -718,6 +670,149 @@ export default function App() {
           </section>
         </div>
       )}
+      {showImportDialog && (
+        <div className="dialog-backdrop" role="presentation">
+          <section
+            className="shortcut-dialog exchange-dialog"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="import-dialog-title"
+          >
+            <header>
+              <h2 id="import-dialog-title">3Dファイルを読み込む</h2>
+              <button
+                type="button"
+                onClick={() => setShowImportDialog(false)}
+                disabled={exchange.importProgress !== undefined}
+              >
+                閉じる
+              </button>
+            </header>
+            <p>GLB、STL、OBJに設定されている座標系を指定します。</p>
+            <div className="exchange-options">
+              <label>
+                <span>入力単位</span>
+                <select
+                  aria-label="読み込み単位"
+                  value={importSettings.unit}
+                  onChange={(event) => {
+                    const unit = event.currentTarget.value as
+                      | "meter"
+                      | "millimeter";
+                    setImportSettings((current) => ({ ...current, unit }));
+                  }}
+                >
+                  <option value="meter">メートル (m)</option>
+                  <option value="millimeter">ミリメートル (mm)</option>
+                </select>
+              </label>
+              <label>
+                <span>入力ファイルのUp軸</span>
+                <select
+                  aria-label="読み込みUp軸"
+                  value={importSettings.upAxis}
+                  onChange={(event) => {
+                    const upAxis = event.currentTarget.value as "y" | "z";
+                    setImportSettings((current) => ({ ...current, upAxis }));
+                  }}
+                >
+                  <option value="y">Y Up</option>
+                  <option value="z">Z Up</option>
+                </select>
+              </label>
+            </div>
+            {exchange.importProgress !== undefined && (
+              <div className="import-progress" role="status">
+                読み込み中 {Math.round(exchange.importProgress * 100)}%
+                <button type="button" onClick={exchange.cancelImport}>
+                  中止
+                </button>
+              </div>
+            )}
+            <div className="dialog-actions">
+              <button
+                type="button"
+                onClick={() => setShowImportDialog(false)}
+                disabled={exchange.importProgress !== undefined}
+              >
+                キャンセル
+              </button>
+              <button
+                type="button"
+                onClick={exchange.openPicker}
+                disabled={exchange.importProgress !== undefined}
+              >
+                ファイルを選択
+              </button>
+            </div>
+          </section>
+        </div>
+      )}
+      {exportFormat && (
+        <div className="dialog-backdrop" role="presentation">
+          <section
+            className="shortcut-dialog exchange-dialog"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="export-dialog-title"
+          >
+            <header>
+              <h2 id="export-dialog-title">3Dファイルを書き出す</h2>
+              <button type="button" onClick={() => setExportFormat(undefined)}>
+                閉じる
+              </button>
+            </header>
+            <div className="exchange-options">
+              <label>
+                <span>出力形式</span>
+                <select
+                  aria-label="出力形式"
+                  value={exportFormat}
+                  onChange={(event) =>
+                    setExportFormat(
+                      event.currentTarget.value as "glb" | "stl" | "obj",
+                    )
+                  }
+                >
+                  <option value="glb">GLB</option>
+                  <option value="stl">STL</option>
+                  <option value="obj">OBJ</option>
+                </select>
+              </label>
+              <label className="exchange-checkbox">
+                <input
+                  type="checkbox"
+                  checked={includeHidden}
+                  onChange={(event) =>
+                    setIncludeHidden(event.currentTarget.checked)
+                  }
+                />
+                非表示のObjectも出力する
+              </label>
+            </div>
+            <p className="dialog-hint">
+              GLBはマテリアルとUVを保持します。STLは形状のみ、OBJは形状とUVを出力します。
+            </p>
+            <div className="dialog-actions">
+              <button type="button" onClick={() => setExportFormat(undefined)}>
+                キャンセル
+              </button>
+              <button
+                type="button"
+                onClick={
+                  exportFormat === "glb"
+                    ? exchange.exportGlb
+                    : exportFormat === "stl"
+                      ? exchange.exportStl
+                      : exchange.exportObj
+                }
+              >
+                書き出す
+              </button>
+            </div>
+          </section>
+        </div>
+      )}
       {persistence.recoverySource && (
         <div className="dialog-backdrop" role="presentation">
           <section
@@ -747,6 +842,15 @@ export default function App() {
           <AlertCircle aria-hidden="true" />
           {errorMessage}
           <button type="button" onClick={() => setErrorMessage(undefined)}>
+            閉じる
+          </button>
+        </div>
+      )}
+      {successMessage && (
+        <div className="success-toast" role="status">
+          <CheckCircle2 aria-hidden="true" />
+          {successMessage}
+          <button type="button" onClick={() => setSuccessMessage(undefined)}>
             閉じる
           </button>
         </div>

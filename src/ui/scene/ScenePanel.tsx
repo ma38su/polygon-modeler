@@ -63,6 +63,7 @@ export function ScenePanel({
 }: ScenePanelProps) {
   const [booleanPending, setBooleanPending] = useState(false);
   const [mergeDistance, setMergeDistance] = useState(0.0001);
+  const [showMergeDialog, setShowMergeDialog] = useState(false);
   const selectedObject = snapshot.objects.find((object) =>
     snapshot.selectedObjectIds.has(object.id),
   );
@@ -283,26 +284,9 @@ export function ScenePanel({
                 </div>
               </dl>
               <div className="mesh-repair-actions">
-                <label>
-                  <span>Merge距離</span>
-                  <input
-                    aria-label="Merge距離"
-                    type="number"
-                    min="0.000001"
-                    step="0.0001"
-                    value={mergeDistance}
-                    onChange={(event) =>
-                      setMergeDistance(Number(event.currentTarget.value))
-                    }
-                  />
-                </label>
                 <button
                   type="button"
-                  onClick={() =>
-                    runAction(() =>
-                      editor.mergeSelectedObjectsByDistance(mergeDistance),
-                    )
-                  }
+                  onClick={() => setShowMergeDialog(true)}
                 >
                   <Combine aria-hidden="true" />
                   Merge by Distance
@@ -317,6 +301,69 @@ export function ScenePanel({
                   法線再計算
                 </button>
               </div>
+              {showMergeDialog && (
+                <div className="dialog-backdrop" role="presentation">
+                  <section
+                    className="shortcut-dialog exchange-dialog"
+                    role="dialog"
+                    aria-modal="true"
+                    aria-labelledby="merge-dialog-title"
+                  >
+                    <header>
+                      <h2 id="merge-dialog-title">Merge by Distance</h2>
+                      <button
+                        type="button"
+                        onClick={() => setShowMergeDialog(false)}
+                      >
+                        閉じる
+                      </button>
+                    </header>
+                    <p>指定距離以内にある頂点を一つに統合します。</p>
+                    <div className="exchange-options">
+                      <label>
+                        <span>Merge距離</span>
+                        <input
+                          aria-label="Merge距離"
+                          type="number"
+                          min="0.000001"
+                          step="0.0001"
+                          value={mergeDistance}
+                          onChange={(event) =>
+                            setMergeDistance(Number(event.currentTarget.value))
+                          }
+                        />
+                      </label>
+                    </div>
+                    <div className="dialog-actions">
+                      <button
+                        type="button"
+                        onClick={() => setShowMergeDialog(false)}
+                      >
+                        キャンセル
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          try {
+                            editor.mergeSelectedObjectsByDistance(
+                              mergeDistance,
+                            );
+                            setShowMergeDialog(false);
+                          } catch (error) {
+                            onError(
+                              error instanceof Error
+                                ? error.message
+                                : String(error),
+                            );
+                          }
+                        }}
+                      >
+                        実行
+                      </button>
+                    </div>
+                  </section>
+                </div>
+              )}
             </div>
           </>
         ) : (

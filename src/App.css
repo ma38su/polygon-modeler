@@ -994,6 +994,44 @@ kbd {
   color: var(--text-secondary);
   font-size: var(--font-size-sm);
 }
+.exchange-dialog p,
+.dialog-hint {
+  color: var(--text-secondary);
+  font-size: var(--font-size-sm);
+}
+.exchange-options {
+  display: grid;
+  gap: var(--space-3);
+  margin: var(--space-4) 0;
+}
+.exchange-options label:not(.exchange-checkbox) {
+  display: grid;
+  grid-template-columns: minmax(130px, 1fr) minmax(160px, 1fr);
+  align-items: center;
+  gap: var(--space-3);
+}
+.exchange-options select {
+  min-height: var(--control-sm);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  color: var(--text-primary);
+  background: var(--surface-2);
+  font-size: var(--font-size-sm);
+}
+.exchange-options input[type="number"] {
+  min-height: var(--control-sm);
+  padding: 0 var(--space-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  color: var(--text-primary);
+  background: var(--surface-2);
+  font-size: var(--font-size-sm);
+}
+.exchange-checkbox {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
 .dialog-actions {
   display: flex;
   justify-content: flex-end;
@@ -1008,7 +1046,8 @@ kbd {
   background: var(--surface-3);
   font-size: var(--font-size-sm);
 }
-.error-toast {
+.error-toast,
+.success-toast {
   position: fixed;
   z-index: 40;
   right: 16px;
@@ -1023,6 +1062,17 @@ kbd {
   color: #ffd3d3;
   background: #4b2424;
   box-shadow: 0 10px 30px rgb(0 0 0 / 30%);
+  font-size: var(--font-size-sm);
+}
+.success-toast {
+  border-color: #367a55;
+  color: #d7ffe5;
+  background: #1f4a32;
+}
+.success-toast button {
+  border: 0;
+  color: inherit;
+  background: transparent;
   font-size: var(--font-size-sm);
 }
 .error-toast svg {

@@ -461,18 +461,23 @@ test("exports GLB and STL and imports the STL in print units", async ({
   await page.getByRole("button", { name: "Box追加" }).click();
 
   const glbPromise = page.waitForEvent("download");
-  await page.getByRole("button", { name: "GLB出力" }).click();
+  await page.getByRole("button", { name: "3D出力" }).click();
+  await page.getByRole("button", { name: "書き出す" }).click();
   const glb = await glbPromise;
   expect(glb.suggestedFilename()).toBe("polygon-model.glb");
 
   const stlPromise = page.waitForEvent("download");
-  await page.getByRole("button", { name: "STL出力" }).click();
+  await page.getByRole("button", { name: "3D出力" }).click();
+  await page.getByLabel("出力形式").selectOption("stl");
+  await page.getByRole("button", { name: "書き出す" }).click();
   const stl = await stlPromise;
   expect(stl.suggestedFilename()).toBe("polygon-model.stl");
   const stlPath = await stl.path();
   expect(stlPath).not.toBeNull();
 
   await page.getByRole("button", { name: "削除" }).click();
+  await page.getByRole("button", { name: "3D読込" }).click();
+  await page.getByLabel("読み込み単位").selectOption("millimeter");
   await page
     .getByLabel("GLB、STLまたはOBJを読み込む")
     .setInputFiles(stlPath!);
@@ -481,4 +486,5 @@ test("exports GLB and STL and imports the STL in print units", async ({
   ).toBeVisible();
   await expect(page.getByText("頂点: 8")).toBeVisible();
   await expect(page.getByText("面: 12")).toBeVisible();
+  await expect(page.getByRole("status")).toContainText("読み込みました");
 });

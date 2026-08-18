@@ -31,6 +31,8 @@ describe("App shell", () => {
       </EditorProvider>,
     );
 
+    fireEvent.click(view.getByRole("button", { name: "3D読込" }));
+
     fireEvent.change(view.getByLabelText("読み込み単位"), {
       target: { value: "millimeter" },
     });
