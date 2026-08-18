@@ -105,13 +105,13 @@ test("shows the empty editor shell", async ({ page }) => {
   );
   await displayLayers.getByRole("button", { name: "Face" }).click();
   const snapControls = page.getByLabel("スナップと軸制限");
-  await snapControls.getByRole("button", { name: "Normal" }).click();
+  await snapControls.getByRole("button", { name: "法線" }).click();
   await expect(page.getByTestId("viewport-canvas")).toHaveAttribute(
     "data-transform-orientation",
     "normal",
   );
-  await snapControls.getByRole("button", { name: "Grid" }).click();
-  await snapControls.getByRole("button", { name: "Vertex" }).click();
+  await snapControls.getByRole("button", { name: "グリッド" }).click();
+  await snapControls.getByRole("button", { name: "頂点" }).click();
   await snapControls.getByRole("button", { name: "X", exact: true }).click();
   await expect(page.getByTestId("viewport-canvas")).toHaveAttribute(
     "data-grid-snap",
@@ -142,7 +142,7 @@ test("shows the empty editor shell", async ({ page }) => {
   );
   await expect(
     page.getByText("Vertex → Edge → Faceの順に判定 / Shiftで追加選択"),
-  ).toBeVisible();
+  ).toHaveCount(0);
   await page.keyboard.press("ControlOrMeta+A");
   await expect(page.getByText("選択: 8")).toBeVisible();
   await page.keyboard.press("Alt+A");
@@ -164,9 +164,10 @@ test("shows the empty editor shell", async ({ page }) => {
   await expect(page.getByText("面: 6")).toBeVisible();
   await expect(page.getByText("選択: 6")).toBeVisible();
   await page.getByRole("button", { name: "Box 1", exact: true }).click();
-  await page.getByRole("button", { name: "移動" }).click();
-  await expect(page.getByRole("button", { name: "移動" })).toHaveClass(
-    /active/,
+  await page.getByRole("button", { name: "移動" }).click({ force: true });
+  await expect(page.getByRole("button", { name: "移動" })).toHaveAttribute(
+    "aria-pressed",
+    "true",
   );
   const positionX = page
     .getByRole("group", { name: "位置" })
@@ -194,8 +195,9 @@ test("shows the empty editor shell", async ({ page }) => {
   await expect(page.getByText("頂点: 36")).toBeVisible();
   await expect(page.getByText("面: 19")).toBeVisible();
   await page.getByRole("button", { name: "正投影" }).click();
-  await expect(page.getByRole("button", { name: "正投影" })).toHaveClass(
-    /active/,
+  await expect(page.getByRole("button", { name: "正投影" })).toHaveAttribute(
+    "aria-pressed",
+    "true",
   );
 });
 
@@ -403,7 +405,7 @@ test("coordinates viewport focus, shortcuts, context menu, and dirty state", asy
   await page.keyboard.press("2");
   await expect(
     page.getByLabel("選択モード").getByRole("button", { name: "Face" }),
-  ).toHaveClass(/active/);
+  ).toHaveAttribute("aria-pressed", "true");
   await page.keyboard.press("r");
   await expect(page.getByText("変形: rotate")).toBeVisible();
 
@@ -478,9 +480,7 @@ test("exports GLB and STL and imports the STL in print units", async ({
   await page.getByRole("button", { name: "削除" }).click();
   await page.getByRole("button", { name: "3D読込" }).click();
   await page.getByLabel("読み込み単位").selectOption("millimeter");
-  await page
-    .getByLabel("GLB、STLまたはOBJを読み込む")
-    .setInputFiles(stlPath!);
+  await page.getByLabel("GLB、STLまたはOBJを読み込む").setInputFiles(stlPath!);
   await expect(
     page.getByRole("button", { name: "STL Mesh", exact: true }),
   ).toBeVisible();

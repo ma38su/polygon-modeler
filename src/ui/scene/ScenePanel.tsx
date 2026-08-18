@@ -29,6 +29,8 @@ import type { TransformOrientation } from "../../viewport/transform/elementSelec
 import type { LightingSettings } from "../../viewport/Viewport";
 import { LightingPanel } from "../inspector/LightingPanel";
 import { ModifierPanel } from "../inspector/ModifierPanel";
+import { Button } from "../primitives/Button";
+import { ControlGroup } from "../primitives/ControlGroup";
 
 interface ScenePanelProps {
   editor: Editor;
@@ -150,51 +152,68 @@ export function ScenePanel({
             ))}
           </ul>
         )}
-        <div className="object-actions">
-          <button
-            type="button"
-            disabled={snapshot.selectedObjectIds.size === 0}
-            onClick={() => editor.duplicateSelectedObjects()}
-          >
-            <Copy aria-hidden="true" />
-            複製
-          </button>
-          <button
-            type="button"
-            disabled={snapshot.selectedObjectIds.size < 2}
-            onClick={() => editor.joinSelectedObjects()}
-          >
-            <Combine aria-hidden="true" />
-            結合
-          </button>
-          {(["x", "y", "z"] as const).map((axis) => (
-            <button
-              type="button"
-              key={axis}
+        <div className="mt-3 space-y-3" aria-label="オブジェクト操作">
+          <ControlGroup label="基本操作">
+            <Button
               disabled={snapshot.selectedObjectIds.size === 0}
-              onClick={() => editor.mirrorSelectedObjects(axis)}
+              title="選択したオブジェクトのコピーを作成"
+              icon={<Copy className="size-4" aria-hidden="true" />}
+              onClick={() => editor.duplicateSelectedObjects()}
             >
-              <FlipHorizontal2 aria-hidden="true" />
-              Mirror {axis.toUpperCase()}
-            </button>
-          ))}
-          {(
-            [
-              ["union", "Union", GitMerge],
-              ["subtract", "Subtract", Minus],
-              ["intersect", "Intersect", Blend],
-            ] as const
-          ).map(([operation, label, Icon]) => (
-            <button
-              type="button"
-              key={operation}
-              disabled={booleanPending || snapshot.selectedObjectIds.size !== 2}
-              onClick={() => void runBoolean(operation)}
+              複製
+            </Button>
+            <Button
+              disabled={snapshot.selectedObjectIds.size < 2}
+              title="2個以上の選択オブジェクトを1個に結合"
+              icon={<Combine className="size-4" aria-hidden="true" />}
+              onClick={() => editor.joinSelectedObjects()}
             >
-              <Icon aria-hidden="true" />
-              {booleanPending ? "演算中…" : label}
-            </button>
-          ))}
+              結合
+            </Button>
+          </ControlGroup>
+          <ControlGroup label="ミラー複製" columns={3}>
+            {(["x", "y", "z"] as const).map((axis) => (
+              <Button
+                key={axis}
+                className="px-1.5"
+                disabled={snapshot.selectedObjectIds.size === 0}
+                title={`${axis.toUpperCase()}軸で反転したコピーを作成`}
+                icon={<FlipHorizontal2 className="size-4" aria-hidden="true" />}
+                onClick={() => editor.mirrorSelectedObjects(axis)}
+              >
+                {axis.toUpperCase()}軸
+              </Button>
+            ))}
+          </ControlGroup>
+          <ControlGroup label="ブーリアン演算（2個選択）" columns={3}>
+            {(
+              [
+                ["union", "和", "Union", GitMerge],
+                ["subtract", "差", "Subtract", Minus],
+                ["intersect", "積", "Intersect", Blend],
+              ] as const
+            ).map(([operation, label, accessibleLabel, Icon]) => (
+              <Button
+                aria-label={accessibleLabel}
+                key={operation}
+                className="px-1.5"
+                disabled={
+                  booleanPending || snapshot.selectedObjectIds.size !== 2
+                }
+                icon={<Icon className="size-4" aria-hidden="true" />}
+                title={
+                  {
+                    union: "2個の形状を足し合わせる（和）",
+                    subtract: "先の形状から後の形状を切り取る（差）",
+                    intersect: "2個の形状が重なる部分だけを残す（積）",
+                  }[operation]
+                }
+                onClick={() => void runBoolean(operation)}
+              >
+                {booleanPending ? "演算中…" : label}
+              </Button>
+            ))}
+          </ControlGroup>
         </div>
       </section>
       <section aria-labelledby="inspector-title">
@@ -204,7 +223,7 @@ export function ScenePanel({
           onChange={onLightingSettingsChange}
         />
         {(selectedObject || snapshot.selectionItems.length > 0) && (
-          <div className="transform-tools" aria-label="変形ツール">
+          <div className="mb-3 grid grid-cols-3 gap-1" aria-label="変形ツール">
             {(
               [
                 ["translate", "移動", Move3D],
@@ -212,16 +231,16 @@ export function ScenePanel({
                 ["scale", "拡大縮小", Expand],
               ] as const
             ).map(([mode, label, Icon]) => (
-              <button
-                type="button"
-                className={transformMode === mode ? "active" : undefined}
+              <Button
+                size="sm"
+                variant={transformMode === mode ? "accent" : "default"}
                 aria-pressed={transformMode === mode}
+                icon={<Icon className="size-3.5" aria-hidden="true" />}
                 onClick={() => onTransformModeChange(mode)}
                 key={mode}
               >
-                <Icon aria-hidden="true" />
                 {label}
-              </button>
+              </Button>
             ))}
           </div>
         )}
@@ -283,23 +302,23 @@ export function ScenePanel({
                   <dd>{diagnostics!.isolatedVertices}</dd>
                 </div>
               </dl>
-              <div className="mesh-repair-actions">
-                <button
-                  type="button"
+              <div className="mt-3 grid grid-cols-2 gap-1.5">
+                <Button
+                  size="sm"
+                  icon={<Combine className="size-3.5" aria-hidden="true" />}
                   onClick={() => setShowMergeDialog(true)}
                 >
-                  <Combine aria-hidden="true" />
                   Merge by Distance
-                </button>
-                <button
-                  type="button"
+                </Button>
+                <Button
+                  size="sm"
+                  icon={<RefreshCw className="size-3.5" aria-hidden="true" />}
                   onClick={() =>
                     runAction(() => editor.recalculateSelectedObjectNormals())
                   }
                 >
-                  <RefreshCw aria-hidden="true" />
                   法線再計算
-                </button>
+                </Button>
               </div>
               {showMergeDialog && (
                 <div className="dialog-backdrop" role="presentation">

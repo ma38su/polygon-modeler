@@ -1,3 +1,5 @@
+/* Semantic application layout and canvas-specific styles.
+ * Reusable controls belong in ui/primitives and Tailwind utilities. */
 .editor-shell {
   min-width: 720px;
   height: 100svh;
@@ -293,22 +295,6 @@ kbd {
   color: var(--text-subtle);
   font-size: var(--font-size-2xs);
 }
-.display-layer-bar button {
-  display: flex;
-  align-items: center;
-  min-height: var(--control-sm);
-  gap: var(--space-1);
-  padding: 0 var(--space-2);
-  border: 0;
-  border-radius: var(--radius-sm);
-  color: var(--text-muted);
-  background: transparent;
-  font-size: var(--font-size-xs);
-}
-.display-layer-bar button.active {
-  color: var(--text-primary);
-  background: var(--surface-3);
-}
 .display-layer-bar svg {
   width: var(--icon-xs);
   height: var(--icon-xs);
@@ -317,21 +303,6 @@ kbd {
   .display-layer-bar {
     top: 52px;
   }
-  .selection-mode-hint {
-    top: 92px;
-  }
-}
-.selection-mode-hint {
-  position: absolute;
-  z-index: 2;
-  top: 52px;
-  left: 164px;
-  padding: var(--space-1) var(--space-2);
-  border-radius: var(--radius-sm);
-  color: var(--text-muted);
-  background: color-mix(in srgb, var(--surface-1), transparent 18%);
-  font-size: var(--font-size-2xs);
-  pointer-events: none;
 }
 .snap-toolbar {
   position: absolute;
@@ -489,11 +460,6 @@ kbd {
   color: var(--text-primary);
   font-variant-numeric: tabular-nums;
 }
-.mesh-repair-actions {
-  display: grid;
-  gap: var(--space-2);
-  margin-top: var(--space-3);
-}
 .mesh-repair-actions label {
   display: grid;
   grid-template-columns: 1fr minmax(72px, 1fr);
@@ -509,38 +475,21 @@ kbd {
   color: var(--text-primary);
   background: var(--surface-2);
 }
-.mesh-repair-actions button {
+.snap-toolbar-group {
   display: flex;
   align-items: center;
-  justify-content: center;
-  gap: var(--space-1);
+  gap: var(--space-0-5);
 }
-.mesh-repair-actions svg {
-  width: var(--icon-xs);
-  height: var(--icon-xs);
+.snap-toolbar-group + .snap-toolbar-group {
+  padding-left: var(--space-2);
+  margin-left: var(--space-1);
+  border-left: 1px solid var(--border);
 }
-.snap-toolbar > span {
-  padding-left: var(--space-1-5);
+.snap-toolbar-label {
+  padding: 0 var(--space-1);
   color: var(--text-subtle);
   font-size: var(--font-size-2xs);
-}
-.snap-toolbar button {
-  display: flex;
-  align-items: center;
-  min-width: var(--control-sm);
-  min-height: var(--control-sm);
-  justify-content: center;
-  gap: var(--space-1);
-  padding: 0 var(--space-2);
-  border: 0;
-  border-radius: var(--radius-sm);
-  color: var(--text-muted);
-  background: transparent;
-  font-size: var(--font-size-xs);
-}
-.snap-toolbar button.active {
-  color: var(--accent-strong);
-  background: var(--accent-muted);
+  white-space: nowrap;
 }
 .snap-toolbar svg {
   width: var(--icon-xs);
@@ -558,35 +507,6 @@ kbd {
   background: color-mix(in srgb, var(--accent-muted), var(--surface-1) 40%);
   font-size: var(--font-size-xs);
   pointer-events: none;
-}
-.selection-mode-bar button {
-  min-height: var(--control-sm);
-  padding: 0 var(--space-2);
-  border: 0;
-  border-radius: var(--radius-sm);
-  color: var(--text-muted);
-  background: transparent;
-  font-size: var(--font-size-sm);
-}
-.selection-mode-bar button.active {
-  color: var(--text-primary);
-  background: var(--surface-3);
-}
-.viewport-toolbar button {
-  display: flex;
-  align-items: center;
-  min-height: var(--control-sm);
-  gap: var(--space-1-5);
-  padding: 0 var(--space-2);
-  border: 0;
-  border-radius: var(--radius-sm);
-  color: var(--text-muted);
-  background: transparent;
-  font-size: var(--font-size-sm);
-}
-.viewport-toolbar button.active {
-  color: var(--text-primary);
-  background: var(--surface-3);
 }
 .viewport-toolbar svg {
   width: var(--icon-sm);
@@ -682,17 +602,6 @@ kbd {
   margin: 0;
   padding: 0;
 }
-.object-actions {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: var(--space-1);
-  margin-top: var(--space-2);
-}
-.object-actions button {
-  min-width: 0;
-  justify-content: center;
-  font-size: var(--font-size-xs);
-}
 .object-list li {
   display: flex;
   align-items: center;
@@ -778,35 +687,10 @@ kbd {
 .lighting-panel button {
   width: 100%;
 }
-.transform-tools {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: var(--space-1);
-  margin: 0 0 var(--space-3);
-}
-.transform-tools button {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: var(--space-1);
-  min-width: 0;
-  min-height: var(--control-sm);
-  padding: 0 var(--space-1);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-sm);
-  color: var(--text-secondary);
-  background: var(--surface-2);
-  font-size: var(--font-size-xs);
-}
-.transform-tools button.active,
 .modeling-actions button.active {
   border-color: color-mix(in srgb, var(--accent), transparent 45%);
   color: var(--accent-bright);
   background: var(--accent-surface);
-}
-.transform-tools svg {
-  width: var(--icon-xs);
-  height: var(--icon-xs);
 }
 .element-transform fieldset {
   margin: 0 0 var(--space-3);
