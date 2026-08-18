@@ -318,13 +318,17 @@ export default function App() {
           <label className="include-hidden">
             単位
             <select
+              aria-label="読み込み単位"
               value={importSettings.unit}
-              onChange={(event) =>
+              onChange={(event) => {
+                const unit = event.currentTarget.value as
+                  | "meter"
+                  | "millimeter";
                 setImportSettings((current) => ({
                   ...current,
-                  unit: event.currentTarget.value as "meter" | "millimeter",
-                }))
-              }
+                  unit,
+                }));
+              }}
             >
               <option value="meter">m</option>
               <option value="millimeter">mm</option>
@@ -333,13 +337,15 @@ export default function App() {
           <label className="include-hidden">
             Up
             <select
+              aria-label="読み込みUp軸"
               value={importSettings.upAxis}
-              onChange={(event) =>
+              onChange={(event) => {
+                const upAxis = event.currentTarget.value as "y" | "z";
                 setImportSettings((current) => ({
                   ...current,
-                  upAxis: event.currentTarget.value as "y" | "z",
-                }))
-              }
+                  upAxis,
+                }));
+              }}
             >
               <option value="y">Y</option>
               <option value="z">Z</option>
